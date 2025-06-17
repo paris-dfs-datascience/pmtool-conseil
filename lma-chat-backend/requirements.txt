@@ -1,0 +1,19 @@
+# Core FastAPI
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Vertex AI Gemini (Primary model + RAG)
+google-cloud-aiplatform>=1.67.0
+vertexai>=1.67.0
+google-generativeai>=0.7.2
+
+# Shared Google dependencies
+google-auth==2.23.4
+google-cloud-core==2.3.3
+protobuf==4.25.1
+
+# Additional utilities
+python-multipart==0.0.6
+python-json-logger==2.0.7
+httpx==0.25.2

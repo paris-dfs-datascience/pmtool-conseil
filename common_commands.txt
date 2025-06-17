@@ -1,0 +1,16 @@
+firebase login --no-localhost
+
+
+# Build and push to Container Registry
+gcloud builds submit --tag gcr.io/lma-website-461920/lma-chat-api
+
+# Deploy to Cloud Run
+gcloud run deploy lma-chat-api \
+  --image gcr.io/lma-website-461920/lma-chat-api \
+  --region us-central1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --memory 1Gi \
+  --cpu 1 \
+  --max-instances 1
+
