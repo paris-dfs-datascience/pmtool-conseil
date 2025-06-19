@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "lma-website-73f7d"
-  }
+    "default": "lma-website-73f7d",
+    "staging": "lma-website-461920"
+  },
+  "targets": {},
+  "etags": {}
 }

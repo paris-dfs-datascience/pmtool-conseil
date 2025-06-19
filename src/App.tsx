@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
+import GitHubCodeAssistantPage from './pages/GitHubCodeAssistantPage';
 import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
 import LMAPage from './pages/LMAPage';
@@ -155,18 +156,7 @@ function App() {
           </div>
         );
       case 'code':
-        return (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-800 mb-4">
-                ⚡ Code Assistant
-              </h1>
-              <p className="text-gray-600">
-                Private Code Assistant
-              </p>
-            </div>
-          </div>
-        );
+        return <GitHubCodeAssistantPage />;
       default:
         return (
           <div className="flex items-center justify-center h-full">
