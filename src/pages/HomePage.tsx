@@ -1,7 +1,7 @@
-// src/pages/HomePage.tsx
 import React from 'react';
+import HeroSection from '../components/HeroSection';
+import ConseilSection from '../components/ConseilSection';
 
-// Define the User type to match your App.tsx
 interface User {
   displayName?: string | null;
   email?: string | null;
@@ -15,20 +15,9 @@ interface HomePageProps {
 
 const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
   return (
-    <div className="h-full relative">
-      <img
-        src="/images/hero_ai.png"
-        alt="Hero"
-        className="w-full h-full object-cover"
-      />
-      {/* Optional: You can add conditional content based on user/isAuthorized here */}
-      {/* 
-      {user && (
-        <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 p-2 rounded">
-          Welcome back, {user.displayName || 'User'}!
-        </div>
-      )}
-      */}
+    <div>
+      <HeroSection user={user} />
+      <ConseilSection />
     </div>
   );
 };

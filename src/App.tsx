@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
 import { signInWithPopup } from 'firebase/auth';
@@ -13,7 +12,6 @@ import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import './App.css';
 
-// Define the User type to match Firebase User
 interface User {
   displayName?: string | null;
   email?: string | null;
@@ -32,7 +30,6 @@ function App() {
     }
   };
 
-  // Show loading spinner while checking auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -56,7 +53,7 @@ function App() {
               🤖 AI Apps for LMA Consultants
             </h3>
             <p className="text-blue-700 text-sm">
-              This is a private AI-powered application suite designed specifically for LMA consultants. 
+              This is a private AI-powered application suite designed specifically for LMA consultants.
               Access requires authorization from the administrator.
             </p>
           </div>
@@ -73,12 +70,10 @@ function App() {
   };
 
   const renderContent = () => {
-    // Home page is always accessible - now using HomePage component
     if (activeTab === 'home') {
       return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
     }
 
-    // If not signed in, show preview pages
     if (!user) {
       switch (activeTab) {
         case 'chat':
@@ -116,12 +111,10 @@ function App() {
       }
     }
 
-    // If signed in but not authorized, show unauthorized page
     if (!isAuthorized) {
       return <UnauthorizedPage userEmail={user.email || undefined} />;
     }
 
-    // Authorized user content
     switch (activeTab) {
       case 'chat':
         return <ChatPage />;
@@ -170,14 +163,12 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center">
-          {/* Logo with image and Crimson Text font */}
           <div className="flex items-center space-x-3">
-            <img 
-              src="/images/logo.png" 
-              alt="Le Marais Advisory Logo" 
+            <img
+              src="/images/logo.png"
+              alt="Le Marais Advisory Logo"
               className="w-8 h-8 rounded-lg"
             />
             <h1 className="text-xl font-semibold text-gray-800" style={{ fontFamily: 'Crimson Text, serif' }}>
@@ -185,8 +176,6 @@ function App() {
             </h1>
           </div>
         </div>
-        
-        {/* Optional: Add additional header content here */}
         <div className="flex items-center space-x-4">
           {user && (
             <span className="text-sm text-gray-600">
@@ -195,18 +184,13 @@ function App() {
           )}
         </div>
       </header>
-
-      {/* Main App Content */}
       <div className="flex flex-1">
-        {/* Sidebar Component */}
-        <Sidebar 
+        <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           user={user}
           isAuthorized={isAuthorized}
         />
-
-        {/* Main Content Area */}
         <div className="flex-1 bg-white">
           {renderContent()}
         </div>
