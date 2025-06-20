@@ -15,7 +15,8 @@ gcloud run deploy lma-chat-api \
   --max-instances 1
 
 git add .
-git commit -m "added Conseil to Home Page"
+git commit -m "working git, removed video. functioning chats."
 git push -u origin main
+
 
 

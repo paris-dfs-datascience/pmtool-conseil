@@ -10,7 +10,7 @@ import GraphitePage from './pages/GraphitePage';
 import UnauthorizedPage from './components/UnauthorizedPage';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
-import './App.css';
+import './index.css'; // Import the Tailwind CSS file
 
 interface User {
   displayName?: string | null;

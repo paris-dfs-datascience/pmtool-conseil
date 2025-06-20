@@ -17,6 +17,7 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
   return (
     <div>
       <HeroSection user={user} />
+      <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <ConseilSection />
     </div>
   );
