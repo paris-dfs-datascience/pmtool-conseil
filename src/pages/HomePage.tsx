@@ -1,6 +1,7 @@
 import React from 'react';
 import HeroSection from '../components/HeroSection';
 import ConseilSection from '../components/ConseilSection';
+import VideoPlayer from '../components/VideoPlayer';
 
 interface User {
   displayName?: string | null;
@@ -14,12 +15,15 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
+  const youtubeUrl = 'https://youtu.be/Yi9sYqIrLNk'; // Example URL
   return (
+    
     <div>
       <HeroSection user={user} />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <ConseilSection />
-    </div>
+      <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
+      <VideoPlayer url={youtubeUrl} />    </div>
   );
 };
 
