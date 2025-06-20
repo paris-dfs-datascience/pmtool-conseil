@@ -5,31 +5,76 @@ from contextlib import asynccontextmanager
 import os
 import logging
 
-# Import routers
-from ChatBasic import router as basic_router
-from ChatRAG import router as rag_router
-from ConsultingPitch import router as consulting_router
-from GitHubCodeAssistant import router as github_router
-
-# Configure logging
+# Configure logging first
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
+# Import routers with error handling
+try:
+    from ChatBasic import router as basic_router
+    logger.info("✅ ChatBasic router imported successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to import ChatBasic router: {e}")
+    basic_router = None
+
+try:
+    from ChatRAG import router as rag_router
+    logger.info("✅ ChatRAG router imported successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to import ChatRAG router: {e}")
+    rag_router = None
+
+try:
+    from ConsultingPitch import router as consulting_router
+    logger.info("✅ ConsultingPitch router imported successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to import ConsultingPitch router: {e}")
+    consulting_router = None
+
+try:
+    from GitHubCodeAssistant import router as github_router
+    logger.info("✅ GitHubCodeAssistant router imported successfully")
+    # Debug the GitHub router specifically
+    if github_router:
+        logger.info(f"GitHub router routes: {len(github_router.routes)}")
+        for route in github_router.routes:
+            if hasattr(route, 'path') and hasattr(route, 'methods'):
+                logger.info(f"  GitHub route: {list(route.methods)} {route.path}")
+except Exception as e:
+    logger.error(f"❌ Failed to import GitHubCodeAssistant router: {e}")
+    github_router = None
+
+try:
+    from CatalantPitch import router as catalant_router
+    logger.info("✅ CatalantPitch router imported successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to import CatalantPitch router: {e}")
+    catalant_router = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting up LMA Chat API with GitHub Code Assistant and Google GenAI")
+    logger.info("🚀 Starting up LMA Chat API with GitHub Code Assistant and Google GenAI")
+    
+    # Log all registered routes
+    logger.info("=== REGISTERED ROUTES ===")
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            methods = list(route.methods)
+            logger.info(f"  {methods} {route.path}")
+    logger.info("=== END ROUTES ===")
+    
     yield
     # Shutdown
-    logger.info("Shutting down LMA Chat API")
+    logger.info("⛔ Shutting down LMA Chat API")
 
 app = FastAPI(
     title="LMA Chat API",
     description="API with Google GenAI basic chat, RAG-enhanced chat, consulting pitch generation, and GitHub code assistance",
-    version="1.2.1",  # Minor version bump for GenAI integration
+    version="1.2.1",
     lifespan=lifespan
 )
 
@@ -43,11 +88,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(basic_router, prefix="/basic", tags=["Basic Chat"])
-app.include_router(rag_router, prefix="/rag", tags=["RAG Chat"])
-app.include_router(consulting_router, prefix="/consulting", tags=["Consulting Pitch"])
-app.include_router(github_router, prefix="/github", tags=["GitHub Code Assistant"])
+# Include routers with error handling
+if basic_router:
+    app.include_router(basic_router, prefix="/basic", tags=["Basic Chat"])
+    logger.info("✅ Basic router included")
+
+if rag_router:
+    app.include_router(rag_router, prefix="/rag", tags=["RAG Chat"])
+    logger.info("✅ RAG router included")
+
+if consulting_router:
+    app.include_router(consulting_router, prefix="/consulting", tags=["Consulting Pitch"])
+    logger.info("✅ Consulting router included")
+
+if github_router:
+    app.include_router(github_router, prefix="/github", tags=["GitHub Code Assistant"])
+    logger.info("✅ GitHub router included")
+    # Debug GitHub routes after inclusion
+    github_routes = [route for route in app.routes if route.path.startswith("/github")]
+    logger.info(f"GitHub routes in app: {len(github_routes)}")
+    for route in github_routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            logger.info(f"  App GitHub route: {list(route.methods)} {route.path}")
+else:
+    logger.error("❌ GitHub router not included - import failed")
+
+if catalant_router:
+    app.include_router(catalant_router, prefix="/catalant", tags=["Catalant Pitch"])
+    logger.info("✅ Catalant router included")
 
 @app.get("/", tags=["Root"])
 def root():
@@ -77,7 +145,7 @@ def root():
         },
         "endpoints": {
             "basic_chat": "/basic/chat",
-            "basic_chat_stream": "/basic/chat/stream",  # Added streaming endpoint
+            "basic_chat_stream": "/basic/chat/stream",
             "basic_status": "/basic/status",
             "rag_chat": "/rag/chat",
             "rag_status": "/rag/status",
@@ -85,9 +153,14 @@ def root():
             "consulting_custom": "/consulting/generate-custom",
             "consulting_status": "/consulting/status",
             "github_chat": "/github/chat",
+            "github_user": "/github/user",
+            "github_repositories": "/github/repositories",
             "github_create_file": "/github/create-file",
             "github_repo_info": "/github/repo-info",
-            "github_status": "/github/status"
+            "github_status": "/github/status",
+            "catalant_pitch": "/catalant/generate-pitch",
+            "catalant_status": "/catalant/status",
+            "catalant_custom": "/catalant/generate-custom"
         },
         "docs": "/docs",
         "health": "/health"
@@ -103,7 +176,7 @@ async def health():
                 "basic_llm": "operational - Google GenAI",
                 "rag_engine": "operational", 
                 "consulting_pitch": "operational",
-                "github_code_assistant": "operational"
+                "github_code_assistant": "operational" if github_router else "unavailable"
             },
             "version": "1.2.1",
             "infrastructure": {
@@ -117,20 +190,44 @@ async def health():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Service unavailable")
 
+# Debug endpoint to show all routes
+@app.get("/debug/routes", tags=["Debug"])
+async def debug_routes():
+    """Debug endpoint to show all registered routes"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods),
+                "name": getattr(route, 'name', 'unknown')
+            })
+    
+    return {
+        "total_routes": len(routes),
+        "routes": routes,
+        "github_routes": [r for r in routes if r["path"].startswith("/github")]
+    }
+
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    """Custom 404 handler"""
+    """Custom 404 handler with debugging info"""
+    logger.warning(f"404 Error: {request.method} {request.url}")
+    
     return JSONResponse(
         status_code=404,
         content={
             "error": "Not Found",
-            "message": "The requested endpoint does not exist",
+            "message": f"The requested endpoint {request.url.path} does not exist",
+            "method": request.method,
+            "debug_url": "/debug/routes",
             "available_endpoints": [
                 "/",
                 "/health",
                 "/docs",
+                "/debug/routes",
                 "/basic/chat",
-                "/basic/chat/stream",  # Added streaming endpoint
+                "/basic/chat/stream",
                 "/basic/status",
                 "/rag/chat",
                 "/rag/status",
@@ -139,9 +236,12 @@ async def not_found_handler(request, exc):
                 "/consulting/pitch-templates",
                 "/consulting/status",
                 "/github/chat",
+                "/github/user",
+                "/github/repositories",
                 "/github/create-file",
                 "/github/repo-info",
-                "/github/status"
+                "/github/status",
+                "/github/test-router"  # Added test endpoint
             ]
         }
     )
@@ -155,7 +255,7 @@ if __name__ == "__main__":
     reload = os.environ.get("RELOAD", "false").lower() == "true"
     log_level = os.environ.get("LOG_LEVEL", "info").lower()
         
-    logger.info(f"Starting server on {host}:{port} with Google GenAI integration")
+    logger.info(f"🚀 Starting server on {host}:{port} with Google GenAI integration")
         
     uvicorn.run(
         "main:app",

@@ -6,7 +6,6 @@ gcloud builds submit --tag gcr.io/lma-website-461920/lma-chat-api
 # Deploy to Cloud Run
 gcloud run deploy lma-chat-api \
   --image gcr.io/lma-website-461920/lma-chat-api \
-  --set-env-vars GITHUB_TOKEN=$GITHUB_TOKEN \
   --region us-central1 \
   --platform managed \
   --allow-unauthenticated \
@@ -15,7 +14,7 @@ gcloud run deploy lma-chat-api \
   --max-instances 1
 
 git add .
-git commit -m "added video player to home page. Need to create and add video"
+git commit -m "fixed issue with GitHub token. Moved to secrets manager in g console"
 git push -u origin main
 
 

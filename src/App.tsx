@@ -7,6 +7,7 @@ import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
 import LMAPage from './pages/LMAPage';
 import GraphitePage from './pages/GraphitePage';
+import CatalantPage from './pages/CatalantPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
@@ -123,6 +124,8 @@ function App() {
       case 'graphite':
         return <GraphitePage />;
       case 'catalant':
+        return <CatalantPage />;
+      case 'linkedin':
         return (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
