@@ -91,8 +91,8 @@ const InteractiveLMADiagram = () => {
   }) => (
     <div
       className={`relative px-6 py-4 rounded-lg cursor-pointer transition-all duration-300 transform ${
-        isActive 
-          ? 'bg-blue-600 text-white scale-105 shadow-lg ring-2 ring-blue-300' 
+        isActive
+          ? 'bg-blue-600 text-white scale-105 shadow-lg ring-2 ring-blue-300'
           : 'bg-slate-700 text-gray-200 hover:bg-slate-600'
       } ${isAnimating && isActive ? 'animate-pulse' : ''}`}
       onClick={() => handleStepClick(index)}
@@ -103,7 +103,7 @@ const InteractiveLMADiagram = () => {
         <Icon size={20} className={isActive ? 'text-white' : 'text-blue-400'} />
         <span className="font-medium text-sm">{title}</span>
       </div>
-      
+
       {isActive && (
         <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
           <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" />
@@ -116,7 +116,7 @@ const InteractiveLMADiagram = () => {
     icon: React.ComponentType<{ size: number; className?: string }>;
     label: string;
   }) => (
-    <div 
+    <div
       className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:scale-105"
       onMouseEnter={(e) => handleMouseEnter(label, e)}
       onMouseLeave={handleMouseLeave}
@@ -130,7 +130,7 @@ const InteractiveLMADiagram = () => {
     icon: React.ComponentType<{ size: number; className?: string }>;
     title: string;
   }) => (
-    <div 
+    <div
       className="flex items-center space-x-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer transform hover:scale-105"
       onMouseEnter={(e) => handleMouseEnter(title, e)}
       onMouseLeave={handleMouseLeave}
@@ -145,10 +145,8 @@ const InteractiveLMADiagram = () => {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Leveraging AI to drive data driven assessments
+          Leveraging AI to drive data driven insights and opportunties
         </h1>
-        <p className="text-lg text-gray-600">LMA turns your data into actionable insights and strategy</p>
-        <p className="text-sm text-gray-500 mt-1">LLM + Analytics + Human in the Loop</p>
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -164,25 +162,55 @@ const InteractiveLMADiagram = () => {
         </div>
 
         {/* Main Flow */}
-        <div className="col-span-8">
-          {/* Google Cloud Header */}
-          <div className="bg-white rounded-lg p-4 mb-6 shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <span className="text-2xl font-bold text-blue-600">GCP Hosted</span>              </div>
-              <div className="text-xl font-semibold text-blue-600">Conseil Advisory Assistant</div>
+          <div className="col-span-8">
+            {/* Google Cloud Header */}
+            <div className="bg-white rounded-lg p-2 mb-2 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="flex-shrink-0 flex items-center justify-center">
+                    <img
+                      src="/images/gcp.png"
+                      alt="Google Cloud"
+                      className="w-40 h-40 object-contain"
+                    />
+                  </div>
+                </div>
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  <img
+                    src="/images/conseil_logo.png"
+                    alt="Conseil Logo"
+                    className="w-40 h-40 object-contain"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
 
           {/* AI Assisted Process Flow */}
-          <div className="bg-gray-200 rounded-xl p-6 mb-6">
+          <div className="bg-gray-200 rounded-xl p-4 mb-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-800">AI Assisted Process Flow</h2>
               <div className="flex items-center space-x-2">
-                <span className="text-lg">✱</span>
-                <span className="text-blue-600 font-bold text-lg">GEMINI</span>
-                <span className="font-bold text-lg">ANTHROPIC</span>
-                <span className="text-orange-500 text-2xl">MISTRAL</span>
+                <div className="h-14 w-14 relative mb-6">
+                  <img
+                    src="/images/Gemini-Logo.png"
+                    alt="Gemini"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="h-14 w-14 relative mb-6">
+                  <img
+                    src="/images/claude_ai.png"
+                    alt="Anthropic"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="h-14 w-14 relative mb-6">
+                  <img
+                    src="/images/mistral-color.png"
+                    alt="Mistral"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
               </div>
             </div>
 
@@ -204,7 +232,7 @@ const InteractiveLMADiagram = () => {
 
           {/* Analysis Components */}
           <div className="grid grid-cols-3 gap-4">
-            <div 
+            <div
               className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer"
               onMouseEnter={(e) => handleMouseEnter('Human Analysis', e)}
               onMouseLeave={handleMouseLeave}
@@ -216,7 +244,7 @@ const InteractiveLMADiagram = () => {
               <div className="text-sm text-gray-600">Expert review and validation</div>
             </div>
 
-            <div 
+            <div
               className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer"
               onMouseEnter={(e) => handleMouseEnter('NLP and Predictive Analytics', e)}
               onMouseLeave={handleMouseLeave}
@@ -228,7 +256,7 @@ const InteractiveLMADiagram = () => {
               <div className="text-sm text-gray-600">AI-powered insights</div>
             </div>
 
-            <div 
+            <div
               className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-300 cursor-pointer"
               onMouseEnter={(e) => handleMouseEnter('Expert and Past Experience Input', e)}
               onMouseLeave={handleMouseLeave}
@@ -270,7 +298,7 @@ const InteractiveLMADiagram = () => {
 
       {/* Tooltip */}
       {hoveredElement && descriptions[hoveredElement] && (
-        <div 
+        <div
           className="fixed z-50 max-w-xs p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-full transition-opacity duration-200"
           style={{
             left: `${tooltipPosition.x}px`,
