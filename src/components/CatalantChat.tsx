@@ -308,11 +308,11 @@ const CatalantPitchGenerator = () => {
           <div>
             <h2 className="text-lg font-semibold text-gray-800 flex items-center">
               <Briefcase size={20} className="mr-2 text-blue-600" />
-              LMA Consulting Opportunities
+              Catalant Pitch Opportunities
             </h2>
             <p className="text-sm text-gray-500 flex items-center">
               <Bot size={14} className="mr-1" />
-              Generate professional responses for consulting opportunities
+              Generate professional responses for consulting opportunities on Catalant
             </p>
           </div>
           

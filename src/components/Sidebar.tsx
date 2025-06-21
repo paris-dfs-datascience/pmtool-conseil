@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, Link, LogIn, LogOut, User, Code } from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -107,22 +107,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
         title={!user ? 'Catalant (Preview)' : isAuthorized ? 'Catalant' : 'Requires authorization'}
       >
         <Briefcase size={24} />
-      </button>
-
-      <button
-        onClick={() => setActiveTab('linkedin')}
-        className={`p-3 rounded-lg transition-colors mb-2 ${
-          activeTab === 'linkedin'
-            ? 'bg-blue-100 text-blue-600'
-            : !user
-            ? 'text-gray-400 hover:bg-blue-50 hover:text-blue-500'
-            : isAuthorized
-            ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-            : 'text-gray-400 hover:bg-red-50 hover:text-red-500'
-        }`}
-        title={!user ? 'LinkedIn Tools (Preview)' : isAuthorized ? 'LinkedIn' : 'Requires authorization'}
-      >
-        <Link size={24} />
       </button>
 
       <button

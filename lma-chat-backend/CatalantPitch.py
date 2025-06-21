@@ -11,6 +11,9 @@ import re
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, SafetySetting
 
+# Import RAG functionalities from ChatRAG
+from ChatRAG import FlexibleRAGProcessor, enhanced_gemini_rag_search, get_safety_settings
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -48,27 +51,6 @@ class ErrorResponse(BaseModel):
     status: str = "error"
     timestamp: datetime
 
-def get_safety_settings():
-    """Get safety settings for Gemini"""
-    return [
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold=SafetySetting.HarmBlockThreshold.OFF
-        ),
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold=SafetySetting.HarmBlockThreshold.OFF
-        ),
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold=SafetySetting.HarmBlockThreshold.OFF
-        ),
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold=SafetySetting.HarmBlockThreshold.OFF
-        ),
-    ]
-
 def count_words(text: str) -> int:
     """Count words in text"""
     return len(text.split())
@@ -82,7 +64,7 @@ def truncate_response(text: str, max_chars: Optional[int] = None, max_words: Opt
         last_period = text.rfind('.')
         if last_period > len(text) * 0.8:  # If period is in last 20%
             text = text[:last_period + 1]
-    
+
     if max_chars and len(text) > max_chars:
         text = text[:max_chars]
         # Try to end at a sentence boundary
@@ -93,12 +75,12 @@ def truncate_response(text: str, max_chars: Optional[int] = None, max_words: Opt
             last_space = text.rfind(' ')
             if last_space > len(text) * 0.9:  # If space is in last 10%
                 text = text[:last_space]
-    
+
     return text.strip()
 
 async def generate_standard_pitch(job_description: str, max_characters: int = 3000) -> str:
-    """Generate a standard consulting pitch response using Gemini"""
-    
+    """Generate a standard consulting pitch response using Gemini and RAG"""
+
     # Enhanced prompt for pitch generation
     prompt = f"""You are 'Matt Paris,' a principal AI and Analytics consultant from the elite firm LMA. Your objective is to write a compelling, personalized pitch to win a new client project based on the provided job description. Your response must be client-centric, demonstrating a clear understanding of their needs and how your specific expertise is the perfect solution.
 
@@ -106,10 +88,6 @@ async def generate_standard_pitch(job_description: str, max_characters: int = 30
 
         *   **Client's Instructions:** 'Experts who personalize their pitch often stand out. Introduce yourself, your background, and relevant experience. Explain why your past projects make you well-suited for the work. Include any helpful project logistics.'
         *   **Job Description:**
-            ```
-            {job_description}
-            ```
-
         **## TASK: DRAFT THE PITCH ##**
 
         Craft a professional, first-person ('I') pitch that directly responds to the `{job_description}`. Follow the precise structure, style, and constraints outlined below.
@@ -142,38 +120,39 @@ async def generate_standard_pitch(job_description: str, max_characters: int = 30
         *   **DO NOT:**
             *   List skills or services without tying them directly to a stated client need.
             *   Use vague consulting jargon (e.g., 'synergies,' 'paradigm shift').
-            *   Exceed the character limit."""
+            *   Exceed the character limit.
+            *   Write less than 1800 characters"""
 
     try:
         model = GenerativeModel(GEMINI_MODEL)
-        
+
         response = model.generate_content(
             prompt,
             generation_config={
                 "max_output_tokens": max_characters // 2,  # Rough token estimate
-                "temperature": 0.4,  # Balanced creativity and consistency
+                "temperature": 0.6,  # Balanced creativity and consistency
                 "top_p": 0.9,
                 "candidate_count": 1,
             },
             safety_settings=get_safety_settings()
         )
-        
+
         if response.text:
             # Clean and format the response
             cleaned_response = response.text.strip()
-            
+
             # Remove any unwanted formatting
             cleaned_response = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_response)  # Remove bold markdown
             cleaned_response = re.sub(r'\*(.*?)\*', r'\1', cleaned_response)  # Remove italic markdown
             cleaned_response = re.sub(r'#{1,6}\s', '', cleaned_response)  # Remove headers
-            
+
             # Ensure it fits within character limit
             final_response = truncate_response(cleaned_response, max_chars=max_characters)
-            
+
             return final_response
         else:
             raise Exception("No response generated from Gemini")
-            
+
     except Exception as e:
         logger.error(f"Error generating standard pitch: {e}")
         # Fallback response
@@ -181,7 +160,7 @@ async def generate_standard_pitch(job_description: str, max_characters: int = 30
 
 async def generate_custom_response(question: str, max_words: int = 500) -> str:
     """Generate a custom response to any question using Gemini with LMA context"""
-    
+
     prompt = f"""You are a senior consultant from LMA, a premier consulting firm specializing in strategic transformation, operational excellence, and executive advisory services. You're answering a specific question from a potential client or project opportunity.
 
 Question: {question}
@@ -216,7 +195,7 @@ Provide a response that showcases LMA's consulting excellence while directly add
 
     try:
         model = GenerativeModel(GEMINI_MODEL)
-        
+
         response = model.generate_content(
             prompt,
             generation_config={
@@ -227,23 +206,23 @@ Provide a response that showcases LMA's consulting excellence while directly add
             },
             safety_settings=get_safety_settings()
         )
-        
+
         if response.text:
             # Clean and format the response
             cleaned_response = response.text.strip()
-            
+
             # Remove unwanted formatting
             cleaned_response = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_response)
             cleaned_response = re.sub(r'\*(.*?)\*', r'\1', cleaned_response)
             cleaned_response = re.sub(r'#{1,6}\s', '', cleaned_response)
-            
+
             # Ensure it fits within word limit
             final_response = truncate_response(cleaned_response, max_words=max_words)
-            
+
             return final_response
         else:
             raise Exception("No response generated from Gemini")
-            
+
     except Exception as e:
         logger.error(f"Error generating custom response: {e}")
         # Fallback response
@@ -253,19 +232,19 @@ Provide a response that showcases LMA's consulting excellence while directly add
 async def generate_pitch(request: PitchRequest):
     """Generate a standard consulting pitch response"""
     start_time = asyncio.get_event_loop().time()
-    
+
     try:
         logger.info(f"Generating pitch for job description: {request.job_description[:100]}...")
-        
+
         # Generate the pitch response
         response_text = await generate_standard_pitch(
-            request.job_description, 
+            request.job_description,
             request.max_characters
         )
-        
+
         end_time = asyncio.get_event_loop().time()
         generation_time_ms = int((end_time - start_time) * 1000)
-        
+
         # Create response
         pitch_response = PitchResponse(
             id=str(int(datetime.now().timestamp() * 1000)),
@@ -276,10 +255,10 @@ async def generate_pitch(request: PitchRequest):
             timestamp=datetime.now(),
             generation_time_ms=generation_time_ms
         )
-        
+
         logger.info(f"Generated pitch in {generation_time_ms}ms, {len(response_text)} characters")
         return pitch_response
-        
+
     except Exception as e:
         logger.error(f"Error generating pitch: {e}")
         raise HTTPException(
@@ -291,19 +270,19 @@ async def generate_pitch(request: PitchRequest):
 async def generate_custom(request: CustomQuestionRequest):
     """Generate a custom response to any question"""
     start_time = asyncio.get_event_loop().time()
-    
+
     try:
         logger.info(f"Generating custom response for question: {request.question[:100]}...")
-        
+
         # Generate the custom response
         response_text = await generate_custom_response(
             request.question,
             request.max_words
         )
-        
+
         end_time = asyncio.get_event_loop().time()
         generation_time_ms = int((end_time - start_time) * 1000)
-        
+
         # Create response
         custom_response = PitchResponse(
             id=str(int(datetime.now().timestamp() * 1000)),
@@ -314,10 +293,10 @@ async def generate_custom(request: CustomQuestionRequest):
             timestamp=datetime.now(),
             generation_time_ms=generation_time_ms
         )
-        
+
         logger.info(f"Generated custom response in {generation_time_ms}ms, {count_words(response_text)} words")
         return custom_response
-        
+
     except Exception as e:
         logger.error(f"Error generating custom response: {e}")
         raise HTTPException(
@@ -331,7 +310,7 @@ async def get_pitch_templates():
     return JSONResponse(content={
         "standard_pitch": {
             "description": "Standard consulting pitch for job opportunities",
-            "max_characters": 2000,
+            "max_characters": 3000,
             "prompt": "Please provide a short pitch detailing why you're interested in this project and the specific relevant skills & experience you would bring to it.",
             "structure": [
                 "Introduce Matt Paris",
@@ -356,7 +335,7 @@ async def get_pitch_templates():
         "lma_context": {
             "specializations": [
                 "Strategic transformation",
-                "Operational excellence", 
+                "Operational excellence",
                 "Digital transformation",
                 "Change management",
                 "Stakeholder alignment",
@@ -378,14 +357,14 @@ async def get_status():
             "Test connection",
             generation_config={"max_output_tokens": 10}
         )
-        
+
         return JSONResponse(content={
             "status": "healthy",
             "service": "consulting-pitch-generator",
             "model": GEMINI_MODEL,
             "features": [
                 "standard_pitch_generation",
-                "custom_question_responses", 
+                "custom_question_responses",
                 "lma_context_awareness",
                 "character_word_limits",
                 "response_optimization"
@@ -393,13 +372,13 @@ async def get_status():
             "gemini_connection": "connected",
             "endpoints": [
                 "/generate-pitch",
-                "/generate-custom", 
+                "/generate-custom",
                 "/pitch-templates",
                 "/status"
             ],
             "last_updated": "2025-06-17"
         })
-        
+
     except Exception as e:
         logger.error(f"Status check failed: {e}")
         return JSONResponse(

@@ -97,11 +97,6 @@ function App() {
             '💼 Catalant Workspace',
             'Professional consulting platform integration for enhanced productivity.'
           );
-        case 'linkedin':
-          return renderPreviewPage(
-            '🔗 LinkedIn Tools',
-            'Advanced LinkedIn automation and networking tools for business development.'
-          );
         case 'code':
           return renderPreviewPage(
             '⚡ Code Assistant',
@@ -125,32 +120,6 @@ function App() {
         return <GraphitePage />;
       case 'catalant':
         return <CatalantPage />;
-      case 'linkedin':
-        return (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-800 mb-4">
-                💼 Catalant
-              </h1>
-              <p className="text-gray-600">
-                Private Catalant section
-              </p>
-            </div>
-          </div>
-        );
-      case 'linkedin':
-        return (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-800 mb-4">
-                🔗 LinkedIn
-              </h1>
-              <p className="text-gray-600">
-                Private LinkedIn tools
-              </p>
-            </div>
-          </div>
-        );
       case 'code':
         return <GitHubCodeAssistantPage />;
       default:

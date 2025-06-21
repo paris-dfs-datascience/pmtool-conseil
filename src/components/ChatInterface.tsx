@@ -1,6 +1,7 @@
 // src/components/ChatInterface.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, CheckCircle, Cloud } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -22,9 +23,9 @@ interface ApiStatus {
   error?: string;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onNewMessage,
-  apiEndpoint = 'https://lma-chat-api-443545551926.us-central1.run.app/basic/chat', // Fixed default
+  apiEndpoint = 'https://lma-chat-api-443545551926.us-central1.run.app/basic/chat',
   placeholder = 'Type your message... (Press Enter to send, Shift+Enter for new line)',
   welcomeMessage = 'Hello! I\'m your AI assistant powered by Gemini AI running on Google Cloud Run. How can I help you today?',
   isLoading: externalLoading = false
@@ -42,25 +43,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [apiStatus, setApiStatus] = useState<ApiStatus>({ connected: false });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Use external loading state if provided, otherwise use internal state
   const actualIsLoading = externalLoading || isLoading;
 
-  // Fixed endpoint logic for basic chat
   const baseUrl = 'https://lma-chat-api-443545551926.us-central1.run.app';
-  const statusEndpoint = `${baseUrl}/basic/status`; // ✅ Fixed to use /basic/status
+  const statusEndpoint = `${baseUrl}/basic/status`;
   const chatEndpoint = apiEndpoint;
 
-  // Check API status on component mount
   useEffect(() => {
     checkApiStatus();
   }, [statusEndpoint]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Update welcome message when prop changes
   useEffect(() => {
     if (messages.length === 1 && messages[0].id === '1') {
       setMessages([{
@@ -74,27 +70,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const checkApiStatus = async () => {
     try {
-      console.log(`🔍 Checking Basic API status at: ${statusEndpoint}`);
       const response = await fetch(statusEndpoint);
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Basic API Status Response:', data);
-        setApiStatus({ 
+        setApiStatus({
           connected: data.status === 'healthy',
           error: data.status !== 'healthy' ? data.error : undefined
         });
       } else {
-        console.error(`❌ Basic Status check failed: HTTP ${response.status}`);
-        setApiStatus({ 
-          connected: false, 
-          error: `HTTP ${response.status}` 
+        setApiStatus({
+          connected: false,
+          error: `HTTP ${response.status}`
         });
       }
     } catch (error) {
-      console.error('❌ Basic Status check error:', error);
-      setApiStatus({ 
-        connected: false, 
-        error: 'Cannot connect to server' 
+      setApiStatus({
+        connected: false,
+        error: 'Cannot connect to server'
       });
     }
   };
@@ -109,10 +101,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       timestamp: new Date()
     };
 
-    // Add user message immediately
     setMessages(prev => [...prev, userMessage]);
-    
-    // Call the callback to update chat history
     if (onNewMessage) {
       onNewMessage(userMessage);
     }
@@ -122,14 +111,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsLoading(true);
 
     try {
-      // Prepare conversation history for API
       const conversationHistory = [...messages, userMessage].map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'assistant',
         content: msg.text
       }));
 
-      console.log(`🚀 Sending message to Basic Chat: ${chatEndpoint}`);
-      
       const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: {
@@ -147,8 +133,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
 
       const data = await response.json();
-      console.log('✅ Basic Chat response received:', data);
-      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: data.response || 'Sorry, I couldn\'t generate a response.',
@@ -157,17 +141,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      
       if (onNewMessage) {
         onNewMessage(assistantMessage);
       }
 
-      // Update API status to connected on successful response
       setApiStatus({ connected: true });
 
     } catch (error) {
-      console.error('❌ Error calling basic chat API:', error);
-      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: 'Sorry, I\'m having trouble connecting to the API. The service might be starting up (this can take a few seconds on first use). Please try again.',
@@ -176,15 +156,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       };
 
       setMessages(prev => [...prev, errorMessage]);
-      
       if (onNewMessage) {
         onNewMessage(errorMessage);
       }
 
-      // Update API status
-      setApiStatus({ 
-        connected: false, 
-        error: error instanceof Error ? error.message : 'Connection failed' 
+      setApiStatus({
+        connected: false,
+        error: error instanceof Error ? error.message : 'Connection failed'
       });
 
     } finally {
@@ -217,7 +195,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               Powered by Gemini AI on Cloud Run
             </p>
           </div>
-          
+
           {/* API Status Indicator */}
           <div className="flex items-center space-x-2">
             {apiStatus.connected ? (
@@ -231,7 +209,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <span className="text-xs">Disconnected</span>
               </div>
             )}
-            
+
             <button
               onClick={testConnection}
               disabled={actualIsLoading}
@@ -241,12 +219,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </button>
           </div>
         </div>
-        
+
         {/* API URL Display */}
         <div className="mt-2 text-xs text-gray-500">
           Mode: BASIC | API: {chatEndpoint}
         </div>
-        
+
         {/* Error Message */}
         {!apiStatus.connected && apiStatus.error && (
           <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
@@ -274,7 +252,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="text-sm whitespace-pre-wrap">{children}</p>
+                }}
+              >
+                {message.text}
+              </ReactMarkdown>
               <p className={`text-xs mt-2 ${
                 message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
               }`}>
@@ -283,7 +267,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           </div>
         ))}
-        
+
         {/* Loading indicator */}
         {actualIsLoading && (
           <div className="flex justify-start">
@@ -297,7 +281,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -325,14 +309,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             )}
           </button>
         </div>
-        
+
         {/* Connection status */}
         <div className="mt-2 text-xs text-gray-500">
-          {actualIsLoading ? 
-            (apiStatus.connected ? 'Sending message...' : 'Waking up service...') : 
-            apiStatus.connected ? 'Ready to chat' : 
-            'Click Test to check connection'
-          }
+          {actualIsLoading ? (
+            apiStatus.connected ? 'Sending message...' : 'Waking up service...'
+          ) : (
+            apiStatus.connected ? 'Ready to chat' : 'Click Test to check connection'
+          )}
         </div>
       </div>
     </div>

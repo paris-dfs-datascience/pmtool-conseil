@@ -2,6 +2,7 @@ import React from 'react';
 import HeroSection from '../components/HeroSection';
 import ConseilSection from '../components/ConseilSection';
 import VideoPlayer from '../components/VideoPlayer';
+import InteractiveLMADiagram from '../components/ConseilInteractiveDiagram';
 
 interface User {
   displayName?: string | null;
@@ -23,7 +24,10 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <ConseilSection />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
-      <VideoPlayer url={youtubeUrl} />    </div>
+      <VideoPlayer url={youtubeUrl} />    
+      <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
+      <InteractiveLMADiagram />
+      </div>
   );
 };
 
