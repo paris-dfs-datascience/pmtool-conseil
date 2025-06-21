@@ -14,7 +14,7 @@ gcloud run deploy lma-chat-api \
   --max-instances 1
 
 git add .
-git commit -m "Minor style adjustments to Conseil"
+git commit -m "Fixed hover components getting stuck on scroll"
 git push -u origin main
 
 

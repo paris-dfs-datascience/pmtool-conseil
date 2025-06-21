@@ -76,6 +76,19 @@ const InteractiveLMADiagram = () => {
     setHoveredElement(null);
   };
 
+  // Add scroll event listener to reset hoveredElement
+  useEffect(() => {
+    const handleScroll = () => {
+      setHoveredElement(null);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
   const FlowArrow = () => (
     <div className="flex items-center mx-2">
       <div className="w-8 h-0.5 bg-blue-400 transition-all duration-300" />
@@ -145,7 +158,7 @@ const InteractiveLMADiagram = () => {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Leveraging AI to drive data driven insights and opportunties
+          Leveraging AI to uncover data driven insights and opportunties
         </h1>
       </div>
 
