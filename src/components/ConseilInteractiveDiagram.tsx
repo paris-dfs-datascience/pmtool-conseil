@@ -169,7 +169,7 @@ const InteractiveLMADiagram = () => {
           <div className="bg-white rounded-lg p-4 mb-6 shadow-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <span className="text-2xl font-bold text-blue-600">Google Cloud</span>              </div>
+                <span className="text-2xl font-bold text-blue-600">GCP Hosted</span>              </div>
               <div className="text-xl font-semibold text-blue-600">Conseil Advisory Assistant</div>
             </div>
           </div>

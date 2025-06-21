@@ -14,7 +14,7 @@ gcloud run deploy lma-chat-api \
   --max-instances 1
 
 git add .
-git commit -m "Added Conseil Interactive Diagram to HomePage, and added markdown cleanup to BasicChat"
+git commit -m "Added Conseil Interactive Diagram to HomePage, and added markdown cleanup to BasicChat, forgot to deploy. now deployed"
 git push -u origin main
 
 
