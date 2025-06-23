@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import logging
 import asyncio
@@ -12,6 +11,9 @@ import hashlib
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, SafetySetting, Tool
 from vertexai.preview import rag
+
+# Import models from separate file
+from models import PitchRequest, CustomQuestionRequest, PitchResponse, ErrorResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -26,31 +28,6 @@ vertexai.init(
 # Configuration constants
 GEMINI_MODEL = 'gemini-2.5-pro'
 GEMINI_FLASH_MODEL = 'gemini-2.0-flash-001'
-
-# Pydantic models
-class PitchRequest(BaseModel):
-    job_description: str = Field(..., min_length=10, max_length=25000, description="The job description to generate a pitch for")
-    max_characters: Optional[int] = Field(default=2000, ge=500, le=5000, description="Maximum characters for the response")
-
-class CustomQuestionRequest(BaseModel):
-    question: str = Field(..., min_length=5, max_length=2500, description="The custom question to answer")
-    max_words: Optional[int] = Field(default=500, ge=100, le=1000, description="Maximum words for the response")
-
-class PitchResponse(BaseModel):
-    id: str
-    type: str  # 'pitch' or 'custom'
-    response: str
-    character_count: Optional[int] = None
-    word_count: Optional[int] = None
-    timestamp: datetime
-    generation_time_ms: int
-    status: str = "success"
-    used_rag: bool = False
-
-class ErrorResponse(BaseModel):
-    error: str
-    status: str = "error"
-    timestamp: datetime
 
 # Consulting area templates for better RAG queries
 CONSULTING_TEMPLATES = {
@@ -116,24 +93,24 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 def truncate_response(text: str, max_chars: Optional[int] = None, max_words: Optional[int] = None) -> str:
-    """Truncate response to fit within limits"""
+    """Truncate response to fit within limits - LESS AGGRESSIVE"""
     if max_words and count_words(text) > max_words:
         words = text.split()
         text = ' '.join(words[:max_words])
         # Try to end at a sentence boundary
         last_period = text.rfind('.')
-        if last_period > len(text) * 0.8:  # If period is in last 20%
+        if last_period > len(text) * 0.7:  # More lenient - last 30%
             text = text[:last_period + 1]
 
     if max_chars and len(text) > max_chars:
         text = text[:max_chars]
         # Try to end at a sentence boundary
         last_period = text.rfind('.')
-        if last_period > len(text) * 0.8:  # If period is in last 20%
+        if last_period > len(text) * 0.7:  # More lenient - last 30%
             text = text[:last_period + 1]
         elif text[-1] != ' ':  # Try to end at word boundary
             last_space = text.rfind(' ')
-            if last_space > len(text) * 0.9:  # If space is in last 10%
+            if last_space > len(text) * 0.8:  # More lenient - last 20%
                 text = text[:last_space]
 
     return text.strip()
@@ -149,10 +126,9 @@ def detect_consulting_area(job_description: str) -> str:
     return 'general'
 
 def get_optimal_model(content_length: int, complexity: str = 'medium') -> str:
-    """Choose model based on content complexity"""
-    if content_length < 800 and complexity in ['low', 'medium']:
-        return GEMINI_FLASH_MODEL  # Faster, cheaper for simple pitches
-    return GEMINI_MODEL  # More capable for complex responses
+    """Choose model based on content complexity - UPDATED to prefer full model for pitches"""
+    # For pitches, always use the full model to get detailed responses
+    return GEMINI_MODEL  # Always use the more capable model for better results
 
 async def get_lma_context_from_rag(query: str) -> str:
     """Get relevant LMA context from RAG system"""
@@ -216,9 +192,9 @@ async def generate_standard_pitch_with_rag(job_description: str, max_characters:
     lma_context = await get_lma_context_from_rag(rag_query)
     used_rag = bool(lma_context.strip())
     
-    # Enhanced prompt with RAG context
+    # Enhanced prompt with RAG context - MUCH MORE DETAILED
     if used_rag:
-        prompt = f"""You are Matt Paris, a principal consultant at LMA. Use the following ACTUAL LMA experience to create a compelling, personalized pitch.
+        prompt = f"""You are Matt Paris, a principal consultant at LMA. Create a COMPREHENSIVE, DETAILED pitch that fully utilizes the character limit of {max_characters} characters.
 
 **LMA's Relevant Experience & Expertise:**
 {lma_context}
@@ -226,51 +202,110 @@ async def generate_standard_pitch_with_rag(job_description: str, max_characters:
 **Job Description to Address:**
 {job_description}
 
-**Your Task:** Write a compelling first-person pitch that demonstrates why LMA (and you as Matt Paris) are the perfect fit for this project.
+**CRITICAL REQUIREMENTS:**
+- TARGET LENGTH: {max_characters - 100} to {max_characters} characters (use nearly the full limit!)
+- Write in first person as Matt Paris from LMA
+- Be comprehensive and detailed, not brief
+- Use specific examples and metrics from LMA experience
+- Include multiple relevant project examples
+- Show deep understanding of their challenges
+- Provide detailed methodology and approach
 
-**PITCH STRUCTURE:**
+**DETAILED PITCH STRUCTURE (expand each section fully):**
 
-1. **Opening (Under 200 characters):** Introduce yourself as Matt Paris from LMA and immediately show you understand their core challenge.
+1. **Strong Opening (150-200 characters):** 
+   - Introduce yourself as Matt Paris, Principal Consultant at LMA
+   - Immediately demonstrate understanding of their specific challenge
+   - Hook them with confidence and expertise
 
-2. **Relevant Experience Connection:** Using the LMA experience above, connect specific past projects and results to their needs. Use phrases like "In a similar project with [type of client], we achieved [specific result]..."
+2. **Relevant Experience Deep Dive (800-1000 characters):**
+   - Connect 2-3 specific LMA projects to their needs
+   - Include quantifiable results and outcomes
+   - Use phrases like "In our work with [similar client], we achieved [specific metric]"
+   - Reference specific methodologies and frameworks used
+   - Show industry expertise and understanding
 
-3. **Proven Track Record:** Reference specific metrics, outcomes, and client types from the LMA experience provided. Make it concrete and credible.
+3. **Proven Track Record & Capabilities (600-800 characters):**
+   - Highlight LMA's broader experience and client base  
+   - Reference specific tools, technologies, and approaches
+   - Include team capabilities and backgrounds
+   - Show scale and sophistication of past work
 
-4. **Approach Outline:** Based on LMA's proven methodologies, outline a clear 3-step approach for their project.
+4. **Detailed Approach & Methodology (600-800 characters):**
+   - Outline a comprehensive 4-5 step approach
+   - Reference LMA's proven frameworks and methodologies
+   - Include timeline and delivery expectations
+   - Show how you'll measure success and deliver value
 
-**REQUIREMENTS:**
-- Write in first person as Matt Paris
-- Use specific examples from the LMA context provided
-- Stay under {max_characters} characters
-- Be professional but confident
-- Focus on client value and proven results"""
+5. **Compelling Close (200-300 characters):**
+   - Reinforce why LMA is the right choice
+   - Include next steps and call to action
+   - Show enthusiasm and confidence
+
+**STYLE REQUIREMENTS:**
+- Professional yet engaging tone
+- Use industry terminology appropriately  
+- Include specific numbers, percentages, and outcomes where possible
+- Make it feel personal and tailored, not generic
+- Use the FULL character limit - don't be brief!
+
+Write a pitch that uses nearly all {max_characters} characters and demonstrates LMA's full capabilities."""
     else:
-        # Fallback prompt without RAG context
-        prompt = f"""You are Matt Paris, a principal consultant at LMA specializing in strategic transformation and operational excellence. Create a compelling pitch for this opportunity.
+        # Enhanced fallback prompt without RAG context
+        prompt = f"""You are Matt Paris, a principal consultant at LMA. Create a COMPREHENSIVE pitch that uses the full character limit of {max_characters} characters.
 
 **Job Description:**
 {job_description}
 
-Write a professional first-person pitch (under {max_characters} characters) that:
-1. Introduces you as Matt Paris from LMA
-2. Shows understanding of their challenge
-3. Highlights relevant consulting experience
-4. Outlines a clear approach
-5. Demonstrates confidence in delivering results
+**CRITICAL REQUIREMENTS:**
+- TARGET LENGTH: {max_characters - 100} to {max_characters} characters
+- Use nearly the entire character limit - be detailed and comprehensive
+- Write in first person as Matt Paris from LMA
+- Show deep consulting expertise and experience
 
-Focus on LMA's expertise in strategic transformation, change management, and operational excellence."""
+**COMPREHENSIVE PITCH STRUCTURE:**
+
+1. **Professional Introduction (150-200 chars):**
+   - Introduce yourself as Matt Paris, Principal Consultant at LMA
+   - Show immediate understanding of their challenge
+
+2. **LMA's Relevant Experience (900-1100 chars):**
+   - Detail multiple relevant consulting engagements
+   - Include specific industries, project types, and outcomes
+   - Reference strategic transformation, change management, operational excellence
+   - Include quantifiable results and client successes
+   - Show breadth and depth of LMA's capabilities
+
+3. **Methodology & Approach (700-900 chars):**
+   - Outline LMA's proven consulting framework
+   - Detail 4-5 specific steps for their project
+   - Include risk mitigation and quality assurance
+   - Reference change management and stakeholder engagement
+   - Show timeline and milestone approach
+
+4. **Team & Capabilities (400-600 chars):**
+   - Highlight LMA's team expertise and backgrounds
+   - Reference relevant certifications and specializations
+   - Show scale of LMA's operations and client base
+   - Include technology and analytical capabilities
+
+5. **Value Proposition & Close (200-300 chars):**
+   - Reinforce LMA's unique value and track record
+   - Include confident next steps and call to action
+   - Show enthusiasm for the opportunity
+
+Focus on LMA's expertise in strategic transformation, digital transformation, change management, and operational excellence. Use the FULL character limit."""
 
     try:
-        # Choose optimal model
-        model_name = get_optimal_model(len(job_description))
-        model = GenerativeModel(model_name)
+        # Always use the more capable model for detailed pitches
+        model = GenerativeModel(GEMINI_MODEL)  # Force use of full model, not flash
 
         response = model.generate_content(
             prompt,
             generation_config={
-                "max_output_tokens": max_characters * 2,  # Allow some buffer
-                "temperature": 0.6,
-                "top_p": 0.9,
+                "max_output_tokens": max_characters * 4,  # Much more generous token limit
+                "temperature": 0.4,  # Slightly lower for more structured response
+                "top_p": 0.95,
                 "candidate_count": 1,
             },
             safety_settings=get_safety_settings()
@@ -283,8 +318,12 @@ Focus on LMA's expertise in strategic transformation, change management, and ope
             cleaned_response = re.sub(r'\*(.*?)\*', r'\1', cleaned_response)
             cleaned_response = re.sub(r'#{1,6}\s', '', cleaned_response)
 
-            # Ensure it fits within character limit
-            final_response = truncate_response(cleaned_response, max_chars=max_characters)
+            # Only truncate if significantly over limit (allow 10% buffer)
+            if len(cleaned_response) > max_characters * 1.1:
+                final_response = truncate_response(cleaned_response, max_chars=max_characters)
+            else:
+                final_response = cleaned_response
+                
             return final_response, used_rag
         else:
             raise Exception("No response generated from Gemini")

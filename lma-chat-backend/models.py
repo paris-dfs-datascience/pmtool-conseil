@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Literal
 from enum import Enum
+from datetime import datetime
 
 class MessageRole(str, Enum):
     """Enum for message roles"""
@@ -54,3 +55,45 @@ class RAGResponse(BaseModel):
     response: str = Field(..., description="Generated response based on retrieved documents")
     status: Literal["success", "error", "no_results"] = Field(..., description="Response status")
     sources: Optional[List[str]] = Field(default=None, description="Sources used for generation")
+
+# PITCH-SPECIFIC MODELS
+
+class PitchRequest(BaseModel):
+    """Request model for pitch generation"""
+    job_description: str = Field(..., min_length=10, max_length=25000, description="The job description to generate a pitch for")
+    max_characters: Optional[int] = Field(default=2500, ge=500, le=5000, description="Maximum characters for the response")
+    
+    @validator('job_description')
+    def validate_job_description(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Job description cannot be empty")
+        return v.strip()
+
+class CustomQuestionRequest(BaseModel):
+    """Request model for custom questions"""
+    question: str = Field(..., min_length=5, max_length=2500, description="The custom question to answer")
+    max_words: Optional[int] = Field(default=500, ge=100, le=1000, description="Maximum words for the response")
+    
+    @validator('question')
+    def validate_question(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Question cannot be empty")
+        return v.strip()
+
+class PitchResponse(BaseModel):
+    """Response model for pitch generation"""
+    id: str = Field(..., description="Unique identifier for the response")
+    type: Literal["pitch", "custom"] = Field(..., description="Type of response generated")
+    response: str = Field(..., description="Generated pitch or answer text")
+    character_count: Optional[int] = Field(default=None, description="Number of characters in response")
+    word_count: Optional[int] = Field(default=None, description="Number of words in response")
+    timestamp: datetime = Field(..., description="When the response was generated")
+    generation_time_ms: int = Field(..., description="Time taken to generate response in milliseconds")
+    status: Literal["success", "error"] = Field(default="success", description="Generation status")
+    used_rag: bool = Field(default=False, description="Whether RAG system was used")
+
+class ErrorResponse(BaseModel):
+    """Error response model"""
+    error: str = Field(..., description="Error message")
+    status: Literal["error"] = Field(default="error", description="Error status")
+    timestamp: datetime = Field(..., description="When the error occurred")
