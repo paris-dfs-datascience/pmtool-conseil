@@ -6,13 +6,12 @@ import logging
 import asyncio
 from datetime import datetime
 import re
+import hashlib
 
 # Official Vertex AI imports
 import vertexai
-from vertexai.preview.generative_models import GenerativeModel, SafetySetting
-
-# Import RAG functionalities from ChatRAG
-from ChatRAG import FlexibleRAGProcessor, enhanced_gemini_rag_search, get_safety_settings
+from vertexai.preview.generative_models import GenerativeModel, SafetySetting, Tool
+from vertexai.preview import rag
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,7 +24,8 @@ vertexai.init(
 )
 
 # Configuration constants
-GEMINI_MODEL = 'gemini-2.0-flash-001'
+GEMINI_MODEL = 'gemini-2.5-pro'
+GEMINI_FLASH_MODEL = 'gemini-2.0-flash-001'
 
 # Pydantic models
 class PitchRequest(BaseModel):
@@ -45,11 +45,71 @@ class PitchResponse(BaseModel):
     timestamp: datetime
     generation_time_ms: int
     status: str = "success"
+    used_rag: bool = False
 
 class ErrorResponse(BaseModel):
     error: str
     status: str = "error"
     timestamp: datetime
+
+# Consulting area templates for better RAG queries
+CONSULTING_TEMPLATES = {
+    'digital_transformation': {
+        'keywords': ['digital', 'transformation', 'technology', 'automation', 'ai', 'data', 'analytics'],
+        'rag_query': 'LMA digital transformation AI implementation data analytics technology projects experience'
+    },
+    'change_management': {
+        'keywords': ['change', 'management', 'organizational', 'culture', 'leadership', 'transition'],
+        'rag_query': 'LMA change management organizational transformation culture leadership experience'
+    },
+    'strategy_consulting': {
+        'keywords': ['strategy', 'strategic', 'planning', 'growth', 'market', 'competitive'],
+        'rag_query': 'LMA strategic consulting business planning market analysis competitive strategy experience'
+    },
+    'operations': {
+        'keywords': ['operations', 'operational', 'efficiency', 'process', 'optimization', 'supply chain'],
+        'rag_query': 'LMA operational excellence process optimization efficiency supply chain experience'
+    },
+    'private_equity': {
+        'keywords': ['private equity', 'pe', 'investment', 'portfolio', 'due diligence', 'value creation'],
+        'rag_query': 'LMA private equity PE investment portfolio due diligence value creation experience'
+    }
+}
+
+def get_rag_tools(similarity_top_k=8):
+    """Get configured RAG tools"""
+    retrieval = rag.Retrieval(
+        source=rag.VertexRagStore(
+            rag_resources=[
+                rag.RagResource(
+                    rag_corpus="projects/lma-website-461920/locations/us-central1/ragCorpora/1152921504606846976"
+                )
+            ],
+            similarity_top_k=similarity_top_k,
+        ),
+    )
+    return [Tool.from_retrieval(retrieval=retrieval)]
+
+def get_safety_settings():
+    """Get safety settings"""
+    return [
+        SafetySetting(
+            category=SafetySetting.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold=SafetySetting.HarmBlockThreshold.OFF
+        ),
+        SafetySetting(
+            category=SafetySetting.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold=SafetySetting.HarmBlockThreshold.OFF
+        ),
+        SafetySetting(
+            category=SafetySetting.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold=SafetySetting.HarmBlockThreshold.OFF
+        ),
+        SafetySetting(
+            category=SafetySetting.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold=SafetySetting.HarmBlockThreshold.OFF
+        ),
+    ]
 
 def count_words(text: str) -> int:
     """Count words in text"""
@@ -78,59 +138,138 @@ def truncate_response(text: str, max_chars: Optional[int] = None, max_words: Opt
 
     return text.strip()
 
-async def generate_standard_pitch(job_description: str, max_characters: int = 3000) -> str:
+def detect_consulting_area(job_description: str) -> str:
+    """Detect primary consulting area to optimize RAG query"""
+    text = job_description.lower()
+    
+    for area, config in CONSULTING_TEMPLATES.items():
+        if any(keyword in text for keyword in config['keywords']):
+            return area
+    
+    return 'general'
+
+def get_optimal_model(content_length: int, complexity: str = 'medium') -> str:
+    """Choose model based on content complexity"""
+    if content_length < 800 and complexity in ['low', 'medium']:
+        return GEMINI_FLASH_MODEL  # Faster, cheaper for simple pitches
+    return GEMINI_MODEL  # More capable for complex responses
+
+async def get_lma_context_from_rag(query: str) -> str:
+    """Get relevant LMA context from RAG system"""
+    try:
+        tools = get_rag_tools()
+        
+        system_instruction = """You are extracting specific LMA experience and expertise. Focus on:
+- Concrete project examples and results
+- Specific industry experience
+- Proven methodologies and approaches
+- Quantifiable outcomes and achievements
+- Team capabilities and backgrounds
+
+Provide detailed, specific information that can be used to demonstrate credibility and expertise."""
+        
+        model = GenerativeModel(
+            GEMINI_MODEL,
+            tools=tools,
+            system_instruction=system_instruction
+        )
+        
+        response = model.generate_content(
+            [query],
+            generation_config={
+                "max_output_tokens": 2048,
+                "temperature": 0.2,
+                "top_p": 0.9,
+                "candidate_count": 1,
+            },
+            safety_settings=get_safety_settings(),
+        )
+        
+        if response.text:
+            # Clean response
+            cleaned = response.text.strip()
+            cleaned = re.sub(r'\[\d+\]', '', cleaned)  # Remove citations
+            return cleaned
+        else:
+            return ""
+            
+    except Exception as e:
+        logger.error(f"RAG context retrieval error: {e}")
+        return ""
+
+async def generate_standard_pitch_with_rag(job_description: str, max_characters: int = 3000) -> tuple[str, bool]:
     """Generate a standard consulting pitch response using Gemini and RAG"""
+    
+    # Detect consulting area for targeted RAG query
+    consulting_area = detect_consulting_area(job_description)
+    
+    # Build targeted RAG query
+    if consulting_area != 'general':
+        rag_query = CONSULTING_TEMPLATES[consulting_area]['rag_query']
+    else:
+        # Extract key terms from job description for RAG query
+        key_terms = re.findall(r'\b[a-zA-Z]{4,}\b', job_description.lower())
+        unique_terms = list(set(key_terms))[:8]  # Take top 8 unique terms
+        rag_query = f"LMA experience with {' '.join(unique_terms)}"
+    
+    # Get relevant LMA context
+    lma_context = await get_lma_context_from_rag(rag_query)
+    used_rag = bool(lma_context.strip())
+    
+    # Enhanced prompt with RAG context
+    if used_rag:
+        prompt = f"""You are Matt Paris, a principal consultant at LMA. Use the following ACTUAL LMA experience to create a compelling, personalized pitch.
 
-    # Enhanced prompt for pitch generation
-    prompt = f"""You are 'Matt Paris,' a principal AI and Analytics consultant from the elite firm LMA. Your objective is to write a compelling, personalized pitch to win a new client project based on the provided job description. Your response must be client-centric, demonstrating a clear understanding of their needs and how your specific expertise is the perfect solution.
+**LMA's Relevant Experience & Expertise:**
+{lma_context}
 
-        **## CONTEXT ##**
+**Job Description to Address:**
+{job_description}
 
-        *   **Client's Instructions:** 'Experts who personalize their pitch often stand out. Introduce yourself, your background, and relevant experience. Explain why your past projects make you well-suited for the work. Include any helpful project logistics.'
-        *   **Job Description:**
-        **## TASK: DRAFT THE PITCH ##**
+**Your Task:** Write a compelling first-person pitch that demonstrates why LMA (and you as Matt Paris) are the perfect fit for this project.
 
-        Craft a professional, first-person ('I') pitch that directly responds to the `{job_description}`. Follow the precise structure, style, and constraints outlined below.
+**PITCH STRUCTURE:**
 
-        **## PITCH STRUCTURE & CONTENT REQUIREMENTS ##**
+1. **Opening (Under 200 characters):** Introduce yourself as Matt Paris from LMA and immediately show you understand their core challenge.
 
-        1.  **Introduction (Strictly under 300 characters):**
-            *   Open with a concise introduction of yourself, Matt Paris from LMA. Immediately show you understand the client's core challenge.
+2. **Relevant Experience Connection:** Using the LMA experience above, connect specific past projects and results to their needs. Use phrases like "In a similar project with [type of client], we achieved [specific result]..."
 
-        2.  **Connect Experience to Needs (The 'Why You' Section):**
-            *   Analyze the `{job_description}` to identify 2-3 key client problems or goals.
-            *   For each problem, explicitly connect it to your specific experience in areas like strategic transformation, process optimization, change management, or data-driven analysis. Frame it as: 'You are looking for a partner with x experience and here is where I have done this in the past...'.
+3. **Proven Track Record:** Reference specific metrics, outcomes, and client types from the LMA experience provided. Make it concrete and credible.
 
-        3.  **Provide Concrete Proof (The 'Proof' Section):**
-            *   Substantiate your claims with specific, metric-driven examples from your 15+ years of consulting.
-            *   Weave in details like: serving Fortune 500 clients, leading cross-functional teams, and achieving tangible results (e.g., 'drove 20% efficiency gains,' 'led a digital transformation impacting 5,000+ users').
+4. **Approach Outline:** Based on LMA's proven methodologies, outline a clear 3-step approach for their project.
 
-        4.  **Outline a High-Level Approach (The 'How' Section):**
-            *   Briefly outline a clear, 3-step plan for how you would tackle this project (e.g., 1. Diagnostic & Stakeholder Alignment; 2. Solution Design & Pilot; 3. Phased Implementation & Value Realization). This demonstrates proactive thinking.
+**REQUIREMENTS:**
+- Write in first person as Matt Paris
+- Use specific examples from the LMA context provided
+- Stay under {max_characters} characters
+- Be professional but confident
+- Focus on client value and proven results"""
+    else:
+        # Fallback prompt without RAG context
+        prompt = f"""You are Matt Paris, a principal consultant at LMA specializing in strategic transformation and operational excellence. Create a compelling pitch for this opportunity.
 
-        **## STYLE & TONE ##**
+**Job Description:**
+{job_description}
 
-        *   **Tone:** Confident, professional, and highly consultative. Not a sales pitch, but an expert recommendation.
-        *   **Perspective:** Write exclusively in the first person ('I').
-        *   **Focus:** Every sentence must deliver value and be relevant to the client's problem.
+Write a professional first-person pitch (under {max_characters} characters) that:
+1. Introduces you as Matt Paris from LMA
+2. Shows understanding of their challenge
+3. Highlights relevant consulting experience
+4. Outlines a clear approach
+5. Demonstrates confidence in delivering results
 
-        **## CRITICAL CONSTRAINTS ##**
-
-        *   **Total Length:** Get as close as possible to the specified `{max_characters}` characters.
-        *   **DO NOT:**
-            *   List skills or services without tying them directly to a stated client need.
-            *   Use vague consulting jargon (e.g., 'synergies,' 'paradigm shift').
-            *   Exceed the character limit.
-            *   Write less than 1800 characters"""
+Focus on LMA's expertise in strategic transformation, change management, and operational excellence."""
 
     try:
-        model = GenerativeModel(GEMINI_MODEL)
+        # Choose optimal model
+        model_name = get_optimal_model(len(job_description))
+        model = GenerativeModel(model_name)
 
         response = model.generate_content(
             prompt,
             generation_config={
-                "max_output_tokens": max_characters // 2,  # Rough token estimate
-                "temperature": 0.6,  # Balanced creativity and consistency
+                "max_output_tokens": max_characters * 2,  # Allow some buffer
+                "temperature": 0.6,
                 "top_p": 0.9,
                 "candidate_count": 1,
             },
@@ -140,67 +279,69 @@ async def generate_standard_pitch(job_description: str, max_characters: int = 30
         if response.text:
             # Clean and format the response
             cleaned_response = response.text.strip()
-
-            # Remove any unwanted formatting
-            cleaned_response = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_response)  # Remove bold markdown
-            cleaned_response = re.sub(r'\*(.*?)\*', r'\1', cleaned_response)  # Remove italic markdown
-            cleaned_response = re.sub(r'#{1,6}\s', '', cleaned_response)  # Remove headers
+            cleaned_response = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_response)
+            cleaned_response = re.sub(r'\*(.*?)\*', r'\1', cleaned_response)
+            cleaned_response = re.sub(r'#{1,6}\s', '', cleaned_response)
 
             # Ensure it fits within character limit
             final_response = truncate_response(cleaned_response, max_chars=max_characters)
-
-            return final_response
+            return final_response, used_rag
         else:
             raise Exception("No response generated from Gemini")
 
     except Exception as e:
-        logger.error(f"Error generating standard pitch: {e}")
-        # Fallback response
-        return f"""Error generating pitch, try again"""
+        logger.error(f"Error generating pitch: {e}")
+        return "Error generating pitch, please try again.", False
 
-async def generate_custom_response(question: str, max_words: int = 500) -> str:
+async def generate_custom_response_with_rag(question: str, max_words: int = 500) -> tuple[str, bool]:
     """Generate a custom response to any question using Gemini with LMA context"""
 
-    prompt = f"""You are a senior consultant from LMA, a premier consulting firm specializing in strategic transformation, operational excellence, and executive advisory services. You're answering a specific question from a potential client or project opportunity.
+    # Get relevant LMA context for the question
+    context_query = f"LMA expertise and experience related to: {question}"
+    lma_expertise = await get_lma_context_from_rag(context_query)
+    used_rag = bool(lma_expertise.strip())
 
-Question: {question}
+    if used_rag:
+        prompt = f"""You are a senior consultant at LMA. Answer this question using our firm's actual experience and expertise.
+
+**Relevant LMA Experience & Capabilities:**
+{lma_expertise}
+
+**Question:** {question}
 
 Provide a comprehensive, professional response that:
+1. Demonstrates LMA's specific expertise using the context provided
+2. References concrete examples and proven results from our experience
+3. Provides actionable insights based on our track record
+4. Shows thought leadership and consulting excellence
+5. Maintains a senior consultant perspective
 
-1. **Demonstrates LMA's expertise** - Show deep knowledge and consulting experience
-2. **Provides actionable insights** - Give practical, implementable advice
-3. **Uses consulting frameworks** - Apply structured thinking and proven methodologies
-4. **Shows industry knowledge** - Reference best practices and industry standards
-5. **Balances strategic and tactical** - Address both high-level strategy and implementation details
+Style: Professional, confident, practical. Reference specific LMA capabilities and experience.
+Length: Maximum {max_words} words."""
+    else:
+        prompt = f"""You are a senior consultant at LMA, a premier consulting firm. Answer this consulting question with expertise and insight.
 
-Your response should reflect:
-- Senior-level consulting experience and perspective
-- Familiarity with Fortune 500 client challenges
-- Expertise in change management and transformation
-- Strong analytical and problem-solving capabilities
-- Understanding of cross-functional business operations
-- Experience with stakeholder management and alignment
+**Question:** {question}
 
-Style Guidelines:
-- Professional consulting tone
-- Clear, structured thinking
-- Specific examples and frameworks where relevant
-- Balanced between being comprehensive and concise
-- Demonstrate thought leadership
-- Show practical implementation experience
+Provide a response that demonstrates:
+- Senior consulting experience and strategic thinking
+- Practical, actionable insights
+- Understanding of business challenges and solutions
+- Professional consulting approach
+- LMA's commitment to excellence and results
 
-Maximum length: {max_words} words
-
-Provide a response that showcases LMA's consulting excellence while directly addressing the question asked."""
+Maximum {max_words} words. Be comprehensive but concise."""
 
     try:
-        model = GenerativeModel(GEMINI_MODEL)
+        # Choose model based on complexity
+        model_name = get_optimal_model(len(question), 'medium')
+        model = GenerativeModel(model_name)
 
         response = model.generate_content(
             prompt,
             generation_config={
-                "max_output_tokens": max_words * 2,  # Rough token estimate
-                "temperature": 0.3,  # Slightly more conservative for custom responses
+                "max_output_tokens": max_words * 3,  # Allow buffer for word count
+                "temperature": 0.3,
                 "top_p": 0.9,
                 "candidate_count": 1,
             },
@@ -210,34 +351,30 @@ Provide a response that showcases LMA's consulting excellence while directly add
         if response.text:
             # Clean and format the response
             cleaned_response = response.text.strip()
-
-            # Remove unwanted formatting
             cleaned_response = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned_response)
             cleaned_response = re.sub(r'\*(.*?)\*', r'\1', cleaned_response)
             cleaned_response = re.sub(r'#{1,6}\s', '', cleaned_response)
 
             # Ensure it fits within word limit
             final_response = truncate_response(cleaned_response, max_words=max_words)
-
-            return final_response
+            return final_response, used_rag
         else:
             raise Exception("No response generated from Gemini")
 
     except Exception as e:
         logger.error(f"Error generating custom response: {e}")
-        # Fallback response
-        return f"""Not able to create response provide more specific information."""
+        return "Unable to generate response. Please provide more specific information.", False
 
 @router.post("/generate-pitch", response_model=PitchResponse)
 async def generate_pitch(request: PitchRequest):
-    """Generate a standard consulting pitch response"""
+    """Generate a standard consulting pitch response with RAG"""
     start_time = asyncio.get_event_loop().time()
 
     try:
         logger.info(f"Generating pitch for job description: {request.job_description[:100]}...")
 
-        # Generate the pitch response
-        response_text = await generate_standard_pitch(
+        # Generate the pitch response with RAG
+        response_text, used_rag = await generate_standard_pitch_with_rag(
             request.job_description,
             request.max_characters
         )
@@ -253,10 +390,11 @@ async def generate_pitch(request: PitchRequest):
             character_count=len(response_text),
             word_count=count_words(response_text),
             timestamp=datetime.now(),
-            generation_time_ms=generation_time_ms
+            generation_time_ms=generation_time_ms,
+            used_rag=used_rag
         )
 
-        logger.info(f"Generated pitch in {generation_time_ms}ms, {len(response_text)} characters")
+        logger.info(f"Generated pitch in {generation_time_ms}ms, {len(response_text)} characters, RAG used: {used_rag}")
         return pitch_response
 
     except Exception as e:
@@ -268,14 +406,14 @@ async def generate_pitch(request: PitchRequest):
 
 @router.post("/generate-custom", response_model=PitchResponse)
 async def generate_custom(request: CustomQuestionRequest):
-    """Generate a custom response to any question"""
+    """Generate a custom response to any question with RAG"""
     start_time = asyncio.get_event_loop().time()
 
     try:
         logger.info(f"Generating custom response for question: {request.question[:100]}...")
 
-        # Generate the custom response
-        response_text = await generate_custom_response(
+        # Generate the custom response with RAG
+        response_text, used_rag = await generate_custom_response_with_rag(
             request.question,
             request.max_words
         )
@@ -291,10 +429,11 @@ async def generate_custom(request: CustomQuestionRequest):
             character_count=len(response_text),
             word_count=count_words(response_text),
             timestamp=datetime.now(),
-            generation_time_ms=generation_time_ms
+            generation_time_ms=generation_time_ms,
+            used_rag=used_rag
         )
 
-        logger.info(f"Generated custom response in {generation_time_ms}ms, {count_words(response_text)} words")
+        logger.info(f"Generated custom response in {generation_time_ms}ms, {count_words(response_text)} words, RAG used: {used_rag}")
         return custom_response
 
     except Exception as e:
@@ -309,41 +448,51 @@ async def get_pitch_templates():
     """Get available pitch templates and guidelines"""
     return JSONResponse(content={
         "standard_pitch": {
-            "description": "Standard consulting pitch for job opportunities",
+            "description": "Standard consulting pitch for job opportunities with RAG-enhanced LMA context",
             "max_characters": 3000,
-            "prompt": "Please provide a short pitch detailing why you're interested in this project and the specific relevant skills & experience you would bring to it.",
+            "features": [
+                "Uses actual LMA experience from knowledge base",
+                "Targeted consulting area detection",
+                "Specific project examples and results",
+                "Proven methodology references"
+            ],
             "structure": [
-                "Introduce Matt Paris",
-                "Relevant LMA experience highlights",
-                "Specific value proposition",
-                "Proven track record examples",
-                "Approach outline",
-                "Confident closing"
+                "Introduce Matt Paris from LMA",
+                "Connect specific LMA experience to client needs",
+                "Reference concrete results and metrics",
+                "Outline proven approach",
+                "Confident closing with next steps"
             ]
         },
         "custom_question": {
-            "description": "Custom response to any consulting question",
+            "description": "Custom response with LMA expertise and context",
             "max_words": 500,
+            "features": [
+                "Leverages LMA knowledge base",
+                "Industry-specific expertise",
+                "Proven frameworks and methodologies",
+                "Actionable insights"
+            ],
             "guidelines": [
-                "Demonstrate LMA expertise",
-                "Provide actionable insights",
-                "Use consulting frameworks",
-                "Show industry knowledge",
-                "Balance strategic and tactical"
+                "Demonstrate LMA expertise with specific examples",
+                "Provide actionable, practical insights",
+                "Reference proven consulting frameworks",
+                "Show industry knowledge and best practices",
+                "Balance strategic and tactical perspectives"
             ]
         },
-        "lma_context": {
-            "specializations": [
-                "Strategic transformation",
-                "Operational excellence",
-                "Digital transformation",
-                "Change management",
-                "Stakeholder alignment",
-                "Process optimization",
-                "Executive advisory"
-            ],
-            "experience": "8+ years management consulting with Fortune 500 clients",
-            "approach": "Data-driven, collaborative, results-focused"
+        "consulting_areas": {
+            "digital_transformation": "AI, data analytics, technology implementation",
+            "change_management": "Organizational transformation, culture, leadership",
+            "strategy_consulting": "Business planning, market analysis, competitive strategy",
+            "operations": "Process optimization, efficiency, supply chain",
+            "private_equity": "Investment support, due diligence, value creation"
+        },
+        "rag_integration": {
+            "corpus_id": "1152921504606846976",
+            "similarity_threshold": 8,
+            "intelligent_querying": True,
+            "context_aware": True
         }
     })
 
@@ -358,25 +507,47 @@ async def get_status():
             generation_config={"max_output_tokens": 10}
         )
 
+        # Test RAG connectivity
+        rag_status = "unknown"
+        try:
+            tools = get_rag_tools()
+            rag_model = GenerativeModel(GEMINI_MODEL, tools=tools)
+            rag_test = rag_model.generate_content(
+                "Test RAG connection",
+                generation_config={"max_output_tokens": 5}
+            )
+            rag_status = "connected"
+        except Exception as e:
+            rag_status = f"error: {str(e)[:100]}"
+
         return JSONResponse(content={
             "status": "healthy",
-            "service": "consulting-pitch-generator",
+            "service": "consulting-pitch-generator-with-rag",
             "model": GEMINI_MODEL,
+            "flash_model": GEMINI_FLASH_MODEL,
             "features": [
-                "standard_pitch_generation",
-                "custom_question_responses",
-                "lma_context_awareness",
-                "character_word_limits",
-                "response_optimization"
+                "rag_enhanced_pitches",
+                "intelligent_consulting_area_detection",
+                "adaptive_model_selection",
+                "lma_context_integration",
+                "character_word_optimization",
+                "performance_tracking"
             ],
             "gemini_connection": "connected",
+            "rag_connection": rag_status,
             "endpoints": [
                 "/generate-pitch",
                 "/generate-custom",
                 "/pitch-templates",
-                "/status"
+                "/status",
+                "/health"
             ],
-            "last_updated": "2025-06-17"
+            "optimization": {
+                "smart_model_selection": True,
+                "targeted_rag_queries": True,
+                "response_caching_ready": True
+            },
+            "last_updated": "2025-06-21"
         })
 
     except Exception as e:
@@ -385,7 +556,7 @@ async def get_status():
             status_code=503,
             content={
                 "status": "degraded",
-                "service": "consulting-pitch-generator",
+                "service": "consulting-pitch-generator-with-rag",
                 "error": str(e),
                 "gemini_connection": "failed"
             }
@@ -397,5 +568,5 @@ async def health_check():
     return JSONResponse(content={
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
-        "service": "consulting-pitch-generator"
+        "service": "consulting-pitch-generator-with-rag"
     })

@@ -35,8 +35,8 @@ except Exception as e:
     consulting_router = None
 
 try:
-    from GitHubCodeAssistant import router as github_router
-    logger.info("✅ GitHubCodeAssistant router imported successfully")
+    from github_assistant import github_router
+    logger.info("✅ GitHub Assistant router imported successfully")
     # Debug the GitHub router specifically
     if github_router:
         logger.info(f"GitHub router routes: {len(github_router.routes)}")
@@ -44,7 +44,7 @@ try:
             if hasattr(route, 'path') and hasattr(route, 'methods'):
                 logger.info(f"  GitHub route: {list(route.methods)} {route.path}")
 except Exception as e:
-    logger.error(f"❌ Failed to import GitHubCodeAssistant router: {e}")
+    logger.error(f"❌ Failed to import GitHub Assistant router: {e}")
     github_router = None
 
 try:
@@ -54,11 +54,18 @@ except Exception as e:
     logger.error(f"❌ Failed to import CatalantPitch router: {e}")
     catalant_router = None
 
+try:
+    from ChatClaude import router as claude_router
+    logger.info("✅ ChatClaude router imported successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to import ChatClaude router: {e}")
+    claude_router = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting up LMA Chat API with GitHub Code Assistant and Google GenAI")
-    
+
     # Log all registered routes
     logger.info("=== REGISTERED ROUTES ===")
     for route in app.routes:
@@ -66,7 +73,7 @@ async def lifespan(app: FastAPI):
             methods = list(route.methods)
             logger.info(f"  {methods} {route.path}")
     logger.info("=== END ROUTES ===")
-    
+
     yield
     # Shutdown
     logger.info("⛔ Shutting down LMA Chat API")
@@ -117,6 +124,10 @@ if catalant_router:
     app.include_router(catalant_router, prefix="/catalant", tags=["Catalant Pitch"])
     logger.info("✅ Catalant router included")
 
+if claude_router:
+    app.include_router(claude_router, prefix="/claude", tags=["Claude Chat"])
+    logger.info("✅ Claude router included")
+
 @app.get("/", tags=["Root"])
 def root():
     """Root endpoint with API information"""
@@ -141,6 +152,12 @@ def root():
             "github_code_assistant": {
                 "description": "GitHub-integrated code assistant with Mistral Codestral",
                 "base_path": "/github"
+            },
+            "claude_chat": {
+                "description": "Anthropic Claude chat with advanced capabilities",
+                "base_path": "/claude",
+                "model": "claude-opus-4@20250514",
+                "features": ["streaming"]
             }
         },
         "endpoints": {
@@ -160,7 +177,10 @@ def root():
             "github_status": "/github/status",
             "catalant_pitch": "/catalant/generate-pitch",
             "catalant_status": "/catalant/status",
-            "catalant_custom": "/catalant/generate-custom"
+            "catalant_custom": "/catalant/generate-custom",
+            "claude_chat": "/claude/chat/claude",
+            "claude_chat_stream": "/claude/chat/claude/stream",
+            "claude_status": "/claude/status/claude"
         },
         "docs": "/docs",
         "health": "/health"
@@ -174,9 +194,10 @@ async def health():
             "status": "healthy",
             "services": {
                 "basic_llm": "operational - Google GenAI",
-                "rag_engine": "operational", 
+                "rag_engine": "operational",
                 "consulting_pitch": "operational",
-                "github_code_assistant": "operational" if github_router else "unavailable"
+                "github_code_assistant": "operational" if github_router else "unavailable",
+                "claude_chat": "operational" if claude_router else "unavailable"
             },
             "version": "1.2.1",
             "infrastructure": {
@@ -202,18 +223,19 @@ async def debug_routes():
                 "methods": list(route.methods),
                 "name": getattr(route, 'name', 'unknown')
             })
-    
+
     return {
         "total_routes": len(routes),
         "routes": routes,
-        "github_routes": [r for r in routes if r["path"].startswith("/github")]
+        "github_routes": [r for r in routes if r["path"].startswith("/github")],
+        "claude_routes": [r for r in routes if r["path"].startswith("/claude")]
     }
 
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     """Custom 404 handler with debugging info"""
     logger.warning(f"404 Error: {request.method} {request.url}")
-    
+
     return JSONResponse(
         status_code=404,
         content={
@@ -241,22 +263,29 @@ async def not_found_handler(request, exc):
                 "/github/create-file",
                 "/github/repo-info",
                 "/github/status",
-                "/github/test-router"  # Added test endpoint
+                "/github/test-router",  # Added test endpoint
+                "/catalant/generate-pitch",
+                "/catalant/generate-custom",
+                "/catalant/pitch-templates",
+                "/catalant/status",
+                "/claude/chat/claude",
+                "/claude/chat/claude/stream",
+                "/claude/status/claude"
             ]
         }
     )
 
 if __name__ == "__main__":
     import uvicorn
-        
+
     # Configuration from environment variables
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", 8080))
     reload = os.environ.get("RELOAD", "false").lower() == "true"
     log_level = os.environ.get("LOG_LEVEL", "info").lower()
-        
+
     logger.info(f"🚀 Starting server on {host}:{port} with Google GenAI integration")
-        
+
     uvicorn.run(
         "main:app",
         host=host,

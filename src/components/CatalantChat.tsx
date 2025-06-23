@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, CheckCircle, Briefcase, User, Bot, Copy, Check, FileText, MessageSquare, Wifi, WifiOff } from 'lucide-react';
+import InfoBox from './InfoBox'; // Import the new InfoBox component
 
 interface PitchResponse {
   id: string;
@@ -94,15 +95,15 @@ const CatalantPitchGenerator = () => {
   const handleAPIError = (error: any, context: string) => {
     console.error(`${context} error:`, error);
     let errorMsg = `Failed to ${context.toLowerCase()}`;
-    
+
     if (error.message) {
       errorMsg += `: ${error.message}`;
     } else if (typeof error === 'string') {
       errorMsg += `: ${error}`;
     }
-    
+
     setErrorMessage(errorMsg);
-    
+
     // Check if it's a network error
     if (error.name === 'TypeError' || error.message?.includes('fetch')) {
       setApiStatus('disconnected');
@@ -158,7 +159,7 @@ const CatalantPitchGenerator = () => {
 
     } catch (error) {
       handleAPIError(error, 'Generate pitch');
-      
+
       // Create error response to show in UI
       const errorResponse: PitchResponse = {
         id: Date.now().toString(),
@@ -169,7 +170,7 @@ const CatalantPitchGenerator = () => {
         characterCount: 0,
         status: 'error'
       };
-      
+
       setPitchResponses(prev => [...prev, errorResponse]);
     } finally {
       setIsGeneratingPitch(false);
@@ -225,7 +226,7 @@ const CatalantPitchGenerator = () => {
 
     } catch (error) {
       handleAPIError(error, 'Generate custom response');
-      
+
       // Create error response to show in UI
       const errorResponse: PitchResponse = {
         id: Date.now().toString(),
@@ -236,7 +237,7 @@ const CatalantPitchGenerator = () => {
         wordCount: 0,
         status: 'error'
       };
-      
+
       setPitchResponses(prev => [...prev, errorResponse]);
     } finally {
       setIsGeneratingCustom(false);
@@ -300,6 +301,8 @@ const CatalantPitchGenerator = () => {
     }
   };
 
+  const infoBoxText = `I am an MBA/Data Scientist with 19+ years as Strategy Consultant. I built Conseil, an Advisory Assistant, to analyze extensive organizational data (SOPs, SOWs, decks, transactions, any data available). This custom solution enables me to conduct deeper analytics and identify insights that traditional consulting methods often overlook. I do both high level strategy and hand-ons development.`;
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
@@ -315,7 +318,7 @@ const CatalantPitchGenerator = () => {
               Generate professional responses for consulting opportunities on Catalant
             </p>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             {/* API Status */}
             <div className="flex items-center space-x-1">
@@ -330,7 +333,7 @@ const CatalantPitchGenerator = () => {
                 </button>
               )}
             </div>
-            
+
             <button
               onClick={clearHistory}
               className="text-xs px-2 py-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md"
@@ -396,6 +399,11 @@ const CatalantPitchGenerator = () => {
         </div>
       </div>
 
+      {/* Info Box */}
+      <div className="p-4">
+        <InfoBox text={infoBoxText} />
+      </div>
+
       {/* Messages/Responses Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {pitchResponses.length === 0 && (
@@ -440,8 +448,8 @@ const CatalantPitchGenerator = () => {
             {/* Response Display */}
             <div className="flex justify-start">
               <div className={`max-w-xs lg:max-w-4xl px-4 py-3 rounded-lg ${
-                response.status === 'error' 
-                  ? 'bg-red-50 border border-red-200 text-red-800' 
+                response.status === 'error'
+                  ? 'bg-red-50 border border-red-200 text-red-800'
                   : 'bg-gray-100 text-gray-800'
               }`}>
                 <div className="flex items-start space-x-2">
@@ -455,145 +463,132 @@ const CatalantPitchGenerator = () => {
                           {response.type === 'pitch' ? 'Standard Pitch Response' : 'Custom Response'}
                         </p>
                         {response.generationTimeMs && response.status !== 'error' && (
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-gray-500">
                             ({response.generationTimeMs}ms)
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {response.status !== 'error' && (
-                          <span className="text-xs text-gray-500">
-                            {response.type === 'pitch' 
-                              ? `${response.characterCount}/2000 chars`
-                              : `${response.wordCount}/500 words`
-                            }
-                          </span>
-                        )}
+                      {response.status !== 'error' && (
                         <button
                           onClick={() => copyToClipboard(response.response, response.id)}
-                          className="text-gray-500 hover:text-gray-700 transition-colors"
+                          className="flex items-center text-gray-500 hover:text-gray-700 text-xs"
+                          title="Copy response"
                         >
                           {copiedId === response.id ? (
-                            <Check size={14} className="text-green-600" />
+                            <>
+                              <Check size={12} className="mr-1" />
+                              Copied
+                            </>
                           ) : (
-                            <Copy size={14} />
+                            <>
+                              <Copy size={12} className="mr-1" />
+                              Copy
+                            </>
                           )}
                         </button>
-                      </div>
+                      )}
                     </div>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{response.response}</p>
-                    <p className="text-xs mt-2 text-gray-500">
-                      {response.timestamp.toLocaleTimeString()}
+                    
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {response.response}
                     </p>
+                    
+                    <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+                      <span>{response.timestamp.toLocaleTimeString()}</span>
+                      {response.status !== 'error' && (
+                        <div className="flex items-center space-x-2">
+                          {response.characterCount && (
+                            <span>{response.characterCount} chars</span>
+                          )}
+                          {response.wordCount && (
+                            <span>{response.wordCount} words</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         ))}
-
-        {/* Loading indicators */}
-        {(isGeneratingPitch || isGeneratingCustom) && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 px-4 py-3 rounded-lg max-w-xs lg:max-w-md">
-              <div className="flex items-center space-x-2">
-                <Bot size={16} className="text-blue-600" />
-                <Loader2 size={16} className="animate-spin text-blue-600" />
-                <p className="text-sm">
-                  {isGeneratingPitch ? 'Crafting your pitch...' : 'Generating custom response...'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
         
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 p-4 bg-gray-50">
         {activeSection === 'pitch' ? (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Job Description (for standard pitch generation):
-            </label>
-            <div className="flex space-x-2">
-              <textarea
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                onKeyPress={(e) => handleKeyPress(e, 'pitch')}
-                placeholder="Paste the job description here... (Press Enter to generate, Shift+Enter for new line)"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[100px] max-h-48"
-                rows={4}
-                disabled={isGeneratingPitch}
-              />
+          <div className="space-y-3">
+            <div className="flex items-start space-x-3">
+              <div className="flex-1">
+                <label htmlFor="job-description" className="block text-sm font-medium text-gray-700 mb-1">
+                  Job Description / Project Details
+                </label>
+                <textarea
+                  id="job-description"
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'pitch')}
+                  placeholder="Paste the job description or project details here... (Press Enter to generate, Shift+Enter for new line)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={3}
+                  disabled={isGeneratingPitch || apiStatus === 'disconnected'}
+                />
+              </div>
               <button
                 onClick={generatePitchResponse}
                 disabled={isGeneratingPitch || !jobDescription.trim() || apiStatus === 'disconnected'}
-                className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors min-w-[120px] flex items-center justify-center"
+                className="mt-6 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center"
+                title="Generate standard pitch response"
               >
                 {isGeneratingPitch ? (
-                  <Loader2 size={20} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <>
-                    <FileText size={16} className="mr-1" />
-                    Generate Pitch
-                  </>
+                  <Send size={16} />
                 )}
               </button>
             </div>
             <p className="text-xs text-gray-500">
-              Will generate a response to: "Please provide a short pitch detailing why you're interested in this project and the specific relevant skills & experience you would bring to it." (Max 2000 characters)
+              Generate a professional pitch response (max 2000 characters)
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Custom Question:
-            </label>
-            <div className="flex space-x-2">
-              <textarea
-                value={customQuestion}
-                onChange={(e) => setCustomQuestion(e.target.value)}
-                onKeyPress={(e) => handleKeyPress(e, 'custom')}
-                placeholder="Enter your specific question here... (Press Enter to generate, Shift+Enter for new line)"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none min-h-[100px] max-h-48"
-                rows={4}
-                disabled={isGeneratingCustom}
-              />
+          <div className="space-y-3">
+            <div className="flex items-start space-x-3">
+              <div className="flex-1">
+                <label htmlFor="custom-question" className="block text-sm font-medium text-gray-700 mb-1">
+                  Custom Question
+                </label>
+                <textarea
+                  id="custom-question"
+                  value={customQuestion}
+                  onChange={(e) => setCustomQuestion(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'custom')}
+                  placeholder="Enter your custom question here... (Press Enter to generate, Shift+Enter for new line)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  rows={3}
+                  disabled={isGeneratingCustom || apiStatus === 'disconnected'}
+                />
+              </div>
               <button
                 onClick={generateCustomResponse}
                 disabled={isGeneratingCustom || !customQuestion.trim() || apiStatus === 'disconnected'}
-                className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors min-w-[120px] flex items-center justify-center"
+                className="mt-6 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center"
+                title="Generate custom response"
               >
                 {isGeneratingCustom ? (
-                  <Loader2 size={20} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <>
-                    <MessageSquare size={16} className="mr-1" />
-                    Generate Response
-                  </>
+                  <Send size={16} />
                 )}
               </button>
             </div>
             <p className="text-xs text-gray-500">
-              Will generate a detailed response to your specific question (Max 500 words)
+              Get a tailored response to your specific question (max 500 words)
             </p>
           </div>
         )}
-        
-        {/* Status */}
-        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-          <span>
-            {isGeneratingPitch || isGeneratingCustom ? 
-              'Generating response...' : 
-              'Ready to generate consulting responses'
-            }
-          </span>
-          {apiStatus === 'disconnected' && (
-            <span className="text-red-600">⚠️ API offline - responses will show errors</span>
-          )}
-        </div>
       </div>
     </div>
   );

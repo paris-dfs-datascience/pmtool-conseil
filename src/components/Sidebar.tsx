@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code } from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -59,6 +59,38 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
         title={!user ? 'AI Chat Assistant (Preview)' : isAuthorized ? 'Chat' : 'Requires authorization'}
       >
         <MessageCircle size={24} />
+      </button>
+
+      <button
+        onClick={() => setActiveTab('claude')}
+        className={`p-3 rounded-lg transition-colors mb-2 ${
+          activeTab === 'chat'
+            ? 'bg-blue-100 text-blue-600'
+            : !user
+            ? 'text-gray-400 hover:bg-blue-50 hover:text-blue-500'
+            : isAuthorized
+            ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+            : 'text-gray-400 hover:bg-red-50 hover:text-red-500'
+        }`}
+        title={!user ? 'Claude AI Chat Assistant (Preview)' : isAuthorized ? 'Claude Chat' : 'Requires authorization'}
+      >
+        <Brain size={24} />
+      </button>
+
+      <button
+        onClick={() => setActiveTab('framework')}
+        className={`p-3 rounded-lg transition-colors mb-2 ${
+          activeTab === 'graphite'
+            ? 'bg-blue-100 text-blue-600'
+            : !user
+            ? 'text-gray-400 hover:bg-blue-50 hover:text-blue-500'
+            : isAuthorized
+            ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+            : 'text-gray-400 hover:bg-red-50 hover:text-red-500'
+        }`}
+        title={!user ? 'Consulting Framework (Preview)' : isAuthorized ? 'Consulting Framework' : 'Requires authorization'}
+      >
+        <LayoutList size={24} />
       </button>
 
       <button

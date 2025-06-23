@@ -5,10 +5,12 @@ import { auth, googleProvider } from './firebase';
 import GitHubCodeAssistantPage from './pages/GitHubCodeAssistantPage';
 import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
+import ConsultingChat from './components/ConsultingChat';
 import LMAPage from './pages/LMAPage';
 import GraphitePage from './pages/GraphitePage';
 import CatalantPage from './pages/CatalantPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
+import ClaudeInterface from './components/ClaudeChat';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import './index.css'; // Import the Tailwind CSS file
@@ -82,6 +84,11 @@ function App() {
             '💬 AI Chat Assistant',
             'Intelligent conversational AI powered by Google Gemini for LMA consulting workflows.'
           );
+          case 'claude':
+          return renderPreviewPage(
+            'Claude Chat',
+            'Intelligent conversational AI powered by Athropic Claude for LMA consulting workflows.'
+          );
         case 'lma':
           return renderPreviewPage(
             '🎡 LMA Knowledge Assistant',
@@ -114,6 +121,10 @@ function App() {
     switch (activeTab) {
       case 'chat':
         return <ChatPage />;
+      case 'claude':
+        return <ClaudeInterface />;
+      case 'framework':
+        return <ConsultingChat />;
       case 'lma':
         return <LMAPage />;
       case 'graphite':

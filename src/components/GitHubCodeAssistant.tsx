@@ -265,6 +265,7 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
       const data = await response.json();
       setApiStatus({ connected: response.ok && data.status === 'operational' });
     } catch (error) {
+      console.error('Error checking API status:', error);
       setApiStatus({ connected: false });
     }
   };
@@ -455,11 +456,11 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
     setIsLoading(true);
 
     try {
-      // Prepare conversation history for the new API format
+      // Prepare conversation history - ensure proper format for backend validation
       const conversationHistory = messages.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'assistant',
         content: msg.text,
-        timestamp: msg.timestamp.toISOString()
+        timestamp: msg.timestamp.toISOString() // Ensure proper ISO format
       }));
 
       // Prepare GitHub context
@@ -467,18 +468,30 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
         repository: selectedRepo.full_name,
         selectedFiles: selectedFiles.map(f => ({
           path: f.path,
-          content: f.content
+          content: f.content || ''
         })),
-        currentPath: currentPath
-      } : undefined;
+        currentPath: currentPath || ''
+      } : null; // Use null instead of undefined
 
+      // Prepare request payload - match backend Pydantic model exactly
       const requestPayload = {
-        message: finalPrompt,
+        message: finalPrompt.trim(), // Ensure trimmed message
         conversation_history: conversationHistory,
-        repository_url: selectedRepo ? `https://github.com/${selectedRepo.full_name}` : undefined,
+        repository_url: selectedRepo ? `https://github.com/${selectedRepo.full_name}` : null, // Use null instead of undefined
         github_context: githubContext,
-        stream: false // Set to false for now, can be changed to true for streaming
+        stream: false,
+        temperature: 0.1,
+        max_tokens: 4000
       };
+
+      // Remove any undefined fields to prevent validation issues
+      Object.keys(requestPayload).forEach(key => {
+        if ((requestPayload as any)[key] === undefined) {
+          delete (requestPayload as any)[key];
+        }
+      });
+
+      console.log('Sending payload:', JSON.stringify(requestPayload, null, 2)); // Debug log
 
       const response = await fetch(`${apiEndpoint}/chat`, {
         method: 'POST',
@@ -488,8 +501,31 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
         body: JSON.stringify(requestPayload),
       });
 
+      // Enhanced error handling
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorDetails: any;
+        try {
+          errorDetails = await response.json();
+        } catch {
+          errorDetails = await response.text();
+        }
+        
+        console.error('API Error Response:', errorDetails);
+        
+        // Handle specific 422 validation errors
+        if (response.status === 422) {
+          let errorMessage = 'Request validation failed.';
+          if (errorDetails && errorDetails.detail) {
+            if (Array.isArray(errorDetails.detail)) {
+              errorMessage = errorDetails.detail.map((err: any) => `${err.loc?.join('.')}: ${err.msg}`).join(', ');
+            } else {
+              errorMessage = errorDetails.detail;
+            }
+          }
+          throw new Error(`Validation Error: ${errorMessage}`);
+        }
+        
+        throw new Error(`HTTP ${response.status}: ${JSON.stringify(errorDetails)}`);
       }
 
       const data = await response.json();
@@ -536,9 +572,21 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
     } catch (error) {
       console.error('Error calling API:', error);
       
+      let errorText = 'Sorry, I\'m having trouble connecting to the GitHub Code Assistant API.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Validation Error')) {
+          errorText = `Request format error: ${error.message}. Please check your input and try again.`;
+        } else if (error.message.includes('422')) {
+          errorText = 'Request validation failed. Please check your message format and try again.';
+        } else {
+          errorText += ` Error: ${error.message}`;
+        }
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I\'m having trouble connecting to the GitHub Code Assistant API. Please try again.',
+        text: errorText,
         sender: 'assistant',
         timestamp: new Date()
       };
