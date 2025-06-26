@@ -1,7 +1,7 @@
 // src/pages/ConsultingPage.tsx
 import React, { useState } from 'react';
-import ConsultingChat from '../components/ConsultingChat';
-import ConsultingFrameworks from '../components/ConsultingFrameworks';
+import ConsultingChat from '../components/ConsultingFrameworks/ConsultingChat';
+import ConsultingFrameworks from '../components/ConsultingFrameworks/ConsultingFrameworks';
 
 interface Message {
   id: string;

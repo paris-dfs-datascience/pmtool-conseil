@@ -5,12 +5,12 @@ import { auth, googleProvider } from './firebase';
 import GitHubCodeAssistantPage from './pages/GitHubCodeAssistantPage';
 import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
-import ConsultingChat from './components/ConsultingChat';
+import ConsultingChat from './components/ConsultingFrameworks/ConsultingChat';
 import LMAPage from './pages/LMAPage';
 import GraphitePage from './pages/GraphitePage';
 import CatalantPage from './pages/CatalantPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
-import ClaudeInterface from './components/ClaudeChat';
+import ClaudeInterface from './components/GeneralChats/ClaudeChat';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import './index.css'; // Import the Tailwind CSS file

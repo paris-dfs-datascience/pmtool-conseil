@@ -1,6 +1,6 @@
 // src/pages/ChatPage.tsx
 import React, { useState } from 'react';
-import ChatInterface from '../components/ChatInterface';
+import ChatInterface from '../components/GeneralChats/ChatInterface';
 import ChatHistory from '../components/ChatHistory';
 
 interface Message {

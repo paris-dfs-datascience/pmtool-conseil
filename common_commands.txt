@@ -14,7 +14,7 @@ gcloud run deploy lma-chat-api \
   --max-instances 1
 
 git add .
-git commit -m "fixed the Catalant chat to work better with RAG engine via prompting"
+git commit -m "added SWOT analysis prompting"
 git push -u origin main
 
 

@@ -1,8 +1,8 @@
 import React from 'react';
-import HeroSection from '../components/HeroSection';
-import ConseilSection from '../components/ConseilSection';
+import HeroSection from '../components/HomePageComponents/HeroSection';
+import ConseilSection from '../components/HomePageComponents/ConseilSection';
 import VideoPlayer from '../components/VideoPlayer';
-import InteractiveLMADiagram from '../components/ConseilInteractiveDiagram';
+import InteractiveLMADiagram from '../components/HomePageComponents/ConseilInteractiveDiagram';
 
 interface User {
   displayName?: string | null;
