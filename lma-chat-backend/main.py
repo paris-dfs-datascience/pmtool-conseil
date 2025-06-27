@@ -4,6 +4,13 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import os
 import logging
+import sys
+from pathlib import Path
+
+# Add the project root to Python path if needed
+project_root = Path(__file__).parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Configure logging first
 logging.basicConfig(
@@ -61,72 +68,143 @@ except Exception as e:
     logger.error(f"❌ Failed to import ChatClaude router: {e}")
     claude_router = None
 
-# Import Consulting Frameworks Manager from folder structure
+# Enhanced Consulting Frameworks import with multiple fallback strategies
+frameworks_available = False
+frameworks_summary_router = None
+get_all_routers = None
+get_framework_status = None
+
+# Strategy 1: Try importing from consulting_frameworks package
 try:
-    from consulting_frameworks.ConsultingFrameworksManager import (
-        get_all_routers, 
-        router as frameworks_summary_router, 
-        get_framework_status
+    from consulting_frameworks import (
+        get_all_routers,
+        get_framework_status,
+        summary_router as frameworks_summary_router
     )
-    logger.info("✅ Consulting Frameworks Manager imported successfully from folder")
+    logger.info("✅ Consulting Frameworks imported successfully from package")
     frameworks_available = True
-except Exception as e:
-    logger.error(f"❌ Failed to import Consulting Frameworks Manager from folder: {e}")
+except ImportError as e:
+    logger.warning(f"⚠️ Package import failed: {e}")
     
-    # Fallback: Try direct import if the files are in root directory
+    # Strategy 2: Try importing from the manager module directly
     try:
-        from ConsultingFrameworksManager import (
-            get_all_routers, 
-            router as frameworks_summary_router, 
+        from consulting_frameworks.ConsultingFrameworksManager import (
+            get_all_routers,
+            router as frameworks_summary_router,
             get_framework_status
         )
-        logger.info("✅ Consulting Frameworks Manager imported successfully from root")
+        logger.info("✅ Consulting Frameworks Manager imported successfully from module")
         frameworks_available = True
-    except Exception as e2:
-        logger.error(f"❌ Failed to import Consulting Frameworks Manager from root: {e2}")
+    except ImportError as e2:
+        logger.warning(f"⚠️ Module import failed: {e2}")
         
-        # Final fallback: Try direct SWOT import
+        # Strategy 3: Try direct imports if files are in root
         try:
-            from consulting_frameworks.SWOTFramework import router as swot_router_direct
-            logger.info("✅ SWOT Framework imported directly from folder - creating minimal setup")
+            from ConsultingFrameworksManager import (
+                get_all_routers,
+                router as frameworks_summary_router,
+                get_framework_status
+            )
+            logger.info("✅ Consulting Frameworks Manager imported successfully from root")
             frameworks_available = True
-            frameworks_summary_router = None
+        except ImportError as e3:
+            logger.warning(f"⚠️ Root import failed: {e3}")
             
-            # Create minimal framework functions
-            def get_framework_status():
-                return {
-                    "available_frameworks": 1,
-                    "total_frameworks": 6,
-                    "status": "partial",
-                    "frameworks": {
-                        "swot": {
+            # Strategy 4: Import individual frameworks directly
+            try:
+                # Try to import SWOT framework directly
+                swot_router_direct = None
+                mckinsey_router_direct = None
+                
+                try:
+                    from consulting_frameworks.SWOTFramework import router as swot_router_direct
+                    logger.info("✅ SWOT Framework imported directly")
+                except ImportError:
+                    from SWOTFramework import router as swot_router_direct
+                    logger.info("✅ SWOT Framework imported from root")
+                
+                try:
+                    from consulting_frameworks.McKinsey7SFramework import router as mckinsey_router_direct
+                    logger.info("✅ McKinsey 7S Framework imported directly")
+                except ImportError:
+                    try:
+                        from McKinsey7SFramework import router as mckinsey_router_direct
+                        logger.info("✅ McKinsey 7S Framework imported from root")
+                    except ImportError:
+                        logger.warning("⚠️ McKinsey 7S Framework not available")
+                
+                # Create minimal framework functions
+                def get_all_routers():
+                    routers = []
+                    if swot_router_direct:
+                        routers.append((swot_router_direct, "/swot", ["SWOT Analysis"]))
+                    if mckinsey_router_direct:
+                        routers.append((mckinsey_router_direct, "/mckinsey_7s", ["McKinsey 7S Framework"]))
+                    return routers
+                
+                def get_framework_status():
+                    available_count = 0
+                    frameworks = {}
+                    
+                    if swot_router_direct:
+                        available_count += 1
+                        frameworks["swot"] = {
                             "name": "SWOT Analysis",
                             "status": "available",
                             "prefix": "/swot",
                             "features_count": 7
                         }
+                    
+                    if mckinsey_router_direct:
+                        available_count += 1
+                        frameworks["mckinsey_7s"] = {
+                            "name": "McKinsey 7S Framework",
+                            "status": "available",
+                            "prefix": "/mckinsey_7s",
+                            "features_count": 7
+                        }
+                    
+                    return {
+                        "available_frameworks": available_count,
+                        "total_frameworks": 6,  # Total planned frameworks
+                        "status": "partial" if available_count > 0 else "unavailable",
+                        "frameworks": frameworks
                     }
-                }
-            
-            def get_all_routers():
-                return [(swot_router_direct, "/swot", ["SWOT Analysis"])]
-            
-        except Exception as e3:
-            logger.error(f"❌ Failed to import SWOT Framework directly: {e3}")
-            frameworks_summary_router = None
-            frameworks_available = False
-            
-            # Fallback functions if frameworks manager is not available
-            def get_framework_status():
-                return {"available_frameworks": 0, "total_frameworks": 0, "status": "unavailable"}
-            
-            def get_all_routers():
-                return []
+                
+                if swot_router_direct or mckinsey_router_direct:
+                    frameworks_available = True
+                    logger.info(f"✅ Direct framework import successful - {len(get_all_routers())} frameworks available")
+                else:
+                    raise ImportError("No frameworks available")
+                    
+            except Exception as e4:
+                logger.error(f"❌ All framework import strategies failed: {e4}")
+                
+                # Final fallback - create empty functions
+                def get_framework_status():
+                    return {
+                        "available_frameworks": 0,
+                        "total_frameworks": 6,
+                        "status": "unavailable",
+                        "error": "Consulting frameworks module not found"
+                    }
+                
+                def get_all_routers():
+                    return []
+                
+                frameworks_available = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting up LMA Chat API with GitHub Code Assistant, Google GenAI, and Consulting Frameworks")
+    
+    # Log framework status
+    if frameworks_available:
+        status = get_framework_status()
+        logger.info(f"📊 Consulting Frameworks: {status['available_frameworks']}/{status['total_frameworks']} available")
+    else:
+        logger.warning("📊 Consulting Frameworks: Not available")
 
     # Log all registered routes
     logger.info("=== REGISTERED ROUTES ===")
@@ -197,7 +275,7 @@ if frameworks_available:
         app.include_router(frameworks_summary_router, prefix="/frameworks", tags=["Consulting Frameworks"])
         logger.info("✅ Consulting Frameworks summary router included")
     else:
-        # Create minimal framework status endpoints if only SWOT is available
+        # Create minimal framework status endpoints if only individual frameworks are available
         from fastapi import APIRouter
         minimal_router = APIRouter()
         
@@ -208,22 +286,43 @@ if frameworks_available:
         @minimal_router.get("/frameworks/list")
         async def minimal_frameworks_list():
             status = get_framework_status()
+            available_frameworks = {}
+            
+            if "swot" in status.get("frameworks", {}):
+                available_frameworks["swot"] = {
+                    "name": "SWOT Analysis",
+                    "description": "Strategic planning technique evaluating Strengths, Weaknesses, Opportunities, and Threats",
+                    "status": "available",
+                    "prefix": "/swot",
+                    "features": [
+                        "Comprehensive SWOT matrix analysis",
+                        "Strategic combinations (SO, WO, ST, WT)",
+                        "Real-time market grounding",
+                        "Interactive chat conversations",
+                        "Streaming responses",
+                        "Competitor analysis",
+                        "Market research integration"
+                    ]
+                }
+            
+            if "mckinsey_7s" in status.get("frameworks", {}):
+                available_frameworks["mckinsey_7s"] = {
+                    "name": "McKinsey 7S Framework",
+                    "description": "Strategic planning framework evaluating seven key organizational elements",
+                    "status": "available",
+                    "prefix": "/mckinsey_7s",
+                    "features": [
+                        "Comprehensive 7S analysis",
+                        "Organizational alignment assessment",
+                        "Real-time market grounding",
+                        "Interactive chat conversations",
+                        "Streaming responses",
+                        "Strategic recommendations"
+                    ]
+                }
+            
             return {
-                "available_frameworks": {
-                    "swot": {
-                        "name": "SWOT Analysis",
-                        "description": "Strategic planning technique evaluating Strengths, Weaknesses, Opportunities, and Threats",
-                        "status": "available",
-                        "prefix": "/swot",
-                        "features": [
-                            "Comprehensive SWOT matrix analysis",
-                            "Strategic combinations (SO, WO, ST, WT)",
-                            "Real-time market grounding",
-                            "Interactive chat conversations",
-                            "Streaming responses"
-                        ]
-                    }
-                },
+                "available_frameworks": available_frameworks,
                 "count": status.get("available_frameworks", 0)
             }
         
@@ -324,12 +423,19 @@ def root():
             # New consulting frameworks endpoints
             "frameworks_status": "/frameworks/frameworks/status",
             "frameworks_list": "/frameworks/frameworks/list",
+        },
+        "framework_endpoints": {
             "swot_info": "/frameworks/swot/info",
             "swot_analyze": "/frameworks/swot/analyze",
             "swot_chat": "/frameworks/swot/chat",
             "swot_stream": "/frameworks/swot/chat/stream",
             "swot_grounding_test": "/frameworks/swot/grounding/test",
-            "swot_status": "/frameworks/swot/status"
+            "swot_status": "/frameworks/swot/status",
+            "mckinsey_7s_info": "/frameworks/mckinsey_7s/info",
+            "mckinsey_7s_analyze": "/frameworks/mckinsey_7s/analyze",
+            "mckinsey_7s_chat": "/frameworks/mckinsey_7s/chat",
+            "mckinsey_7s_stream": "/frameworks/mckinsey_7s/chat/stream",
+            "mckinsey_7s_status": "/frameworks/mckinsey_7s/status"
         },
         "docs": "/docs",
         "health": "/health"

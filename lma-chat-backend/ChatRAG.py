@@ -87,8 +87,8 @@ def get_safety_settings():
         ),
     ]
 
-def clean_response(text: str) -> str:
-    """Enhanced response cleaning"""
+def clean_basic_artifacts(text: str) -> str:
+    """Remove only the basic artifacts like citations and references"""
     if not text:
         return ""
     
@@ -100,21 +100,60 @@ def clean_response(text: str) -> str:
     clean_text = re.sub(r'Document \d+:', '', clean_text)
     clean_text = re.sub(r'Page \d+:', '', clean_text)
     
-    # Remove markdown artifacts that might appear
+    # Remove repetitive phrases
+    clean_text = re.sub(r'Based on the provided context,?\s*', '', clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r'According to the documents?,?\s*', '', clean_text, flags=re.IGNORECASE)
+    
+    # Remove markdown artifacts
     clean_text = re.sub(r'\*\*(.*?)\*\*', r'\1', clean_text)  # Bold
     clean_text = re.sub(r'\*(.*?)\*', r'\1', clean_text)      # Italic
     clean_text = re.sub(r'#{1,6}\s', '', clean_text)         # Headers
     
-    # Fix spacing and punctuation
-    clean_text = re.sub(r'\.(?=[A-Z])', '. ', clean_text)
-    clean_text = re.sub(r'\s+', ' ', clean_text)
-    clean_text = re.sub(r'\n\s*\n', '\n\n', clean_text)  # Fix double newlines
-    
-    # Remove repetitive phrases that RAG sometimes generates
-    clean_text = re.sub(r'Based on the provided context,?\s*', '', clean_text, flags=re.IGNORECASE)
-    clean_text = re.sub(r'According to the documents?,?\s*', '', clean_text, flags=re.IGNORECASE)
-    
     return clean_text.strip()
+
+async def format_with_llm(text: str) -> str:
+    """Use Gemini Flash to format the response with proper spacing"""
+    try:
+        # Initialize Flash model for formatting
+        format_model = GenerativeModel(GEMINI_FLASH_MODEL)
+        
+        format_prompt = f"""Format the following text to be more readable by adding proper paragraph breaks and spacing. 
+
+Rules:
+- Add paragraph breaks between distinct topics or ideas
+- Preserve bullet points and lists with proper spacing
+- Keep the exact same content and meaning
+- Don't add or remove any information
+- Just improve the spacing and structure for readability
+- Use double newlines between paragraphs
+- Use single newlines for list items
+- If there's a signature block (name, title, email, etc.), format it nicely
+
+Text to format:
+{text}
+
+Formatted text:"""
+
+        response = format_model.generate_content(
+            [format_prompt],
+            generation_config={
+                "max_output_tokens": 4096,
+                "temperature": 0.1,  # Very low for consistent formatting
+                "top_p": 0.9,
+            },
+            safety_settings=get_safety_settings(),
+        )
+        
+        if response.text:
+            return response.text.strip()
+        else:
+            # Fallback to original if formatting fails
+            return text
+            
+    except Exception as e:
+        logger.error(f"LLM formatting error: {e}")
+        # Return original text if formatting fails
+        return text
 
 def categorize_query(query: str) -> str:
     """Categorize query to optimize RAG retrieval"""
@@ -177,7 +216,7 @@ def choose_model_for_query(query: str, category: str) -> str:
     return GEMINI_MODEL
 
 async def enhanced_rag_search(query: str, conversation_context: str = "") -> tuple[str, bool]:
-    """Enhanced RAG search with better prompting and error handling"""
+    """Enhanced RAG search with LLM-based formatting"""
     try:
         # Enhance query and get category
         enhanced_query, category = enhance_query(query)
@@ -236,7 +275,7 @@ Response Style: Professional, informative, and engaging - like a knowledgeable c
             [full_query],
             generation_config={
                 "max_output_tokens": 4096,  # Good balance of detail vs speed
-                "temperature": 0.2,         # Low for consistency
+                "temperature": 0.1,         # Low for consistency
                 "top_p": 0.9,
                 "candidate_count": 1,
             },
@@ -244,8 +283,13 @@ Response Style: Professional, informative, and engaging - like a knowledgeable c
         )
         
         if response.text:
-            cleaned_response = clean_response(response.text)
-            return cleaned_response, True
+            # First, clean basic artifacts
+            cleaned_response = clean_basic_artifacts(response.text)
+            
+            # Then format with LLM for better readability
+            formatted_response = await format_with_llm(cleaned_response)
+            
+            return formatted_response, True
         else:
             return "", False
             
@@ -376,7 +420,8 @@ async def enhanced_status():
                 "conversation_context",
                 "adaptive_model_selection", 
                 "enhanced_prompting",
-                "intelligent_fallbacks"
+                "intelligent_fallbacks",
+                "llm_based_formatting"
             ],
             "query_categories": list(QUERY_PATTERNS.keys())
         }

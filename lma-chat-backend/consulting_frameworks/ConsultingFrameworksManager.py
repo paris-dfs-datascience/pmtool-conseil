@@ -1,10 +1,10 @@
-# consulting_frameworks/ConsultingFrameworksManager.py
 """
 Central manager for all consulting frameworks.
 This module imports and organizes all framework routers for easy integration.
 """
 
 import logging
+import traceback
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from fastapi import APIRouter
@@ -27,35 +27,37 @@ class FrameworkInfo:
 
 class ConsultingFrameworksManager:
     """Manager class for all consulting frameworks"""
-    
+
     def __init__(self):
         self.frameworks: Dict[str, FrameworkInfo] = {}
         self.routers: List[tuple] = []  # (router, prefix, tags)
         self.initialize_frameworks()
-    
+
     def initialize_frameworks(self):
         """Initialize all available frameworks"""
         logger.info("🚀 Initializing Consulting Frameworks Manager")
-        
+
         # Initialize SWOT Framework
         self._load_swot_framework()
-        
+
+        # Initialize McKinsey 7S Framework
+        self._load_mckinsey_7s_framework()
+
         # TODO: Add other frameworks as we build them
         # self._load_porters_five_forces()
-        # self._load_mckinsey_7s()
         # self._load_balanced_scorecard()
         # self._load_root_cause_analysis()
         # self._load_issue_tree()
-        
+
         logger.info(f"✅ Frameworks Manager initialized with {len(self.frameworks)} frameworks")
         self._log_framework_status()
-    
+
     def _load_swot_framework(self):
         """Load SWOT Analysis framework"""
         try:
-            # Import from the same directory
+            # Import from the same package using relative import
             from .SWOTFramework import router as swot_router
-            
+
             self.frameworks["swot"] = FrameworkInfo(
                 name="SWOT Analysis",
                 description="Strategic planning technique evaluating Strengths, Weaknesses, Opportunities, and Threats",
@@ -73,10 +75,10 @@ class ConsultingFrameworksManager:
                     "Market research integration"
                 ]
             )
-            
+
             self.routers.append((swot_router, "/swot", ["SWOT Analysis"]))
             logger.info("✅ SWOT Framework loaded successfully")
-            
+
         except ImportError as e:
             self.frameworks["swot"] = FrameworkInfo(
                 name="SWOT Analysis",
@@ -88,7 +90,8 @@ class ConsultingFrameworksManager:
                 error_message=f"Import error: {str(e)}"
             )
             logger.error(f"❌ Failed to load SWOT Framework: {e}")
-            
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+
         except Exception as e:
             self.frameworks["swot"] = FrameworkInfo(
                 name="SWOT Analysis",
@@ -100,64 +103,117 @@ class ConsultingFrameworksManager:
                 error_message=f"Initialization error: {str(e)}"
             )
             logger.error(f"❌ Error initializing SWOT Framework: {e}")
-    
-    def _load_porters_five_forces(self):
-        """Load Porter's Five Forces framework"""
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+
+    def _load_mckinsey_7s_framework(self):
+        """Load McKinsey 7S framework"""
         try:
-            from .PortersFramework import router as porters_router
+            logger.debug("🔍 Attempting to import McKinsey 7S Framework...")
             
-            self.frameworks["porters"] = FrameworkInfo(
-                name="Porter's Five Forces",
-                description="Industry competitiveness and profitability analysis framework",
-                router=porters_router,
-                prefix="/porters",
-                tags=["Porter's Five Forces", "Industry Analysis"],
+            # Import from the same package using relative import
+            from .McKinsey7SFramework import router as mckinsey_7s_router
+            
+            logger.debug("✅ McKinsey 7S Framework module imported successfully")
+
+            self.frameworks["mckinsey_7s"] = FrameworkInfo(
+                name="McKinsey 7S Framework",
+                description="A strategic planning framework that evaluates the seven key elements of an organization",
+                router=mckinsey_7s_router,
+                prefix="/mckinsey_7s",
+                tags=["McKinsey 7S Framework", "Strategic Planning"],
                 status="available",
                 features=[
-                    "Five forces competitive analysis",
-                    "Industry attractiveness assessment",
-                    "Competitive positioning guidance",
-                    "Market entry evaluation",
-                    "Real-time industry data"
+                    "Comprehensive 7S matrix analysis",
+                    "Strategic combinations (SO, WO, ST, WT)",
+                    "Real-time market grounding",
+                    "Interactive chat conversations",
+                    "Streaming responses",
+                    "Competitor analysis",
+                    "Market research integration"
                 ]
             )
-            
-            self.routers.append((porters_router, "/porters", ["Porter's Five Forces"]))
-            logger.info("✅ Porter's Five Forces Framework loaded successfully")
-            
+
+            self.routers.append((mckinsey_7s_router, "/mckinsey_7s", ["McKinsey 7S Framework"]))
+            logger.info("✅ McKinsey 7S Framework loaded successfully")
+
         except ImportError as e:
-            self.frameworks["porters"] = FrameworkInfo(
-                name="Porter's Five Forces",
-                description="Industry analysis framework (unavailable)",
+            error_details = {
+                "error_type": "ImportError",
+                "error_message": str(e),
+                "module_name": e.name if hasattr(e, 'name') else 'Unknown',
+                "module_path": e.path if hasattr(e, 'path') else 'Unknown'
+            }
+            
+            self.frameworks["mckinsey_7s"] = FrameworkInfo(
+                name="McKinsey 7S Framework",
+                description="Strategic planning framework (unavailable)",
                 router=None,
-                prefix="/porters",
-                tags=["Porter's Five Forces"],
+                prefix="/mckinsey_7s",
+                tags=["McKinsey 7S Framework"],
                 status="unavailable",
                 error_message=f"Import error: {str(e)}"
             )
-            logger.error(f"❌ Failed to load Porter's Framework: {e}")
-    
+            
+            logger.error(f"❌ Failed to load McKinsey 7S Framework - ImportError")
+            logger.error(f"Error details: {error_details}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+        except AttributeError as e:
+            # This might happen if the module exists but doesn't have a 'router' attribute
+            self.frameworks["mckinsey_7s"] = FrameworkInfo(
+                name="McKinsey 7S Framework",
+                description="Strategic planning framework (error)",
+                router=None,
+                prefix="/mckinsey_7s",
+                tags=["McKinsey 7S Framework"],
+                status="error",
+                error_message=f"AttributeError: {str(e)} - Module might not have a 'router' attribute"
+            )
+            
+            logger.error(f"❌ McKinsey 7S Framework module found but missing 'router' attribute")
+            logger.error(f"AttributeError: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+        except Exception as e:
+            # Catch any other unexpected errors
+            error_type = type(e).__name__
+            
+            self.frameworks["mckinsey_7s"] = FrameworkInfo(
+                name="McKinsey 7S Framework",
+                description="Strategic planning framework (error)",
+                router=None,
+                prefix="/mckinsey_7s",
+                tags=["McKinsey 7S Framework"],
+                status="error",
+                error_message=f"{error_type}: {str(e)}"
+            )
+            
+            logger.error(f"❌ Unexpected error loading McKinsey 7S Framework")
+            logger.error(f"Error type: {error_type}")
+            logger.error(f"Error message: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
     def get_available_frameworks(self) -> Dict[str, FrameworkInfo]:
         """Get all available frameworks"""
         return {k: v for k, v in self.frameworks.items() if v.status == "available"}
-    
+
     def get_unavailable_frameworks(self) -> Dict[str, FrameworkInfo]:
         """Get unavailable frameworks"""
         return {k: v for k, v in self.frameworks.items() if v.status != "available"}
-    
+
     def get_framework_by_name(self, name: str) -> Optional[FrameworkInfo]:
         """Get framework by name"""
         return self.frameworks.get(name)
-    
+
     def get_all_routers(self) -> List[tuple]:
         """Get all available routers for FastAPI inclusion"""
         return [(router, prefix, tags) for router, prefix, tags in self.routers if router is not None]
-    
+
     def get_framework_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all frameworks"""
         available_count = len(self.get_available_frameworks())
         unavailable_count = len(self.get_unavailable_frameworks())
-        
+
         return {
             "total_frameworks": len(self.frameworks),
             "available_frameworks": available_count,
@@ -173,7 +229,7 @@ class ConsultingFrameworksManager:
                 for name, info in self.frameworks.items()
             }
         }
-    
+
     def _log_framework_status(self):
         """Log the status of all frameworks"""
         logger.info("=== CONSULTING FRAMEWORKS STATUS ===")
@@ -236,7 +292,7 @@ async def framework_info(framework_name: str):
     if not framework:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Framework not found")
-    
+
     return {
         "name": framework.name,
         "description": framework.description,

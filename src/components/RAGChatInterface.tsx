@@ -1,4 +1,3 @@
-// src/components/RAGChatInterface.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, CheckCircle, Database, Search, Bot, User } from 'lucide-react';
 
@@ -20,6 +19,86 @@ interface ApiStatus {
   connected: boolean;
   error?: string;
 }
+
+// Helper function to format text with proper spacing and structure
+const formatMessageText = (text: string): React.ReactNode => {
+  // Split by double newlines to identify paragraphs
+  const paragraphs = text.split(/\n\n+/);
+  
+  return paragraphs.map((paragraph, index) => {
+    // Check if this paragraph is a list (starts with - or * or number.)
+    const isUnorderedList = paragraph.includes('\n-') || paragraph.includes('\n*') || 
+                           paragraph.startsWith('-') || paragraph.startsWith('*');
+    const isOrderedList = /^\d+\./.test(paragraph) || /\n\d+\./.test(paragraph);
+    
+    if (isUnorderedList || isOrderedList) {
+      // Split list items
+      const items = paragraph.split('\n').filter(item => item.trim());
+      return (
+        <ul key={index} className={isOrderedList ? "list-decimal" : "list-disc"} 
+            style={{ marginLeft: '1.5rem', marginBottom: '1rem' }}>
+          {items.map((item, itemIndex) => {
+            // Remove list markers
+            const cleanedItem = item.replace(/^[-*]\s*/, '').replace(/^\d+\.\s*/, '');
+            return <li key={itemIndex} className="mb-1">{cleanedItem}</li>;
+          })}
+        </ul>
+      );
+    }
+    
+    // Check if it's a heading (starts with # or is in all caps)
+    const isHeading = paragraph.startsWith('#') || 
+                     (paragraph.length < 100 && paragraph === paragraph.toUpperCase());
+    
+    if (isHeading) {
+      const headingText = paragraph.replace(/^#+\s*/, '');
+      return (
+        <h3 key={index} className="font-semibold text-base mb-2 mt-3">
+          {headingText}
+        </h3>
+      );
+    }
+    
+    // Check for code blocks (enclosed in backticks)
+    if (paragraph.includes('```') || paragraph.includes('`')) {
+      const codeFormatted = paragraph.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+        return `<pre class="bg-gray-800 text-gray-100 p-3 rounded-md overflow-x-auto mb-3"><code>${code.trim()}</code></pre>`;
+      });
+      
+      // Replace inline code
+      const inlineFormatted = codeFormatted.replace(/`([^`]+)`/g, 
+        '<code class="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-sm">$1</code>');
+      
+      return (
+        <div key={index} dangerouslySetInnerHTML={{ __html: inlineFormatted }} />
+      );
+    }
+    
+    // Regular paragraph - split by single newlines for line breaks
+    const lines = paragraph.split('\n');
+    return (
+      <p key={index} className="mb-3 leading-relaxed">
+        {lines.map((line, lineIndex) => (
+          <React.Fragment key={lineIndex}>
+            {line}
+            {lineIndex < lines.length - 1 && <br />}
+          </React.Fragment>
+        ))}
+      </p>
+    );
+  });
+};
+
+// Message component with better formatting
+const MessageContent: React.FC<{ text: string; sender: 'user' | 'assistant' }> = ({ text, sender }) => {
+  if (sender === 'user') {
+    // User messages can be simpler
+    return <p className="text-sm whitespace-pre-wrap">{text}</p>;
+  }
+  
+  // Assistant messages get full formatting
+  return <div className="text-sm space-y-2">{formatMessageText(text)}</div>;
+};
 
 const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({ 
   onNewMessage,
@@ -100,6 +179,32 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
     }
   };
 
+  // Helper function to clean and format the response from the backend
+  const cleanAndFormatResponse = (response: string): string => {
+    // Remove excessive whitespace
+    let cleaned = response.trim();
+    
+    // Ensure proper spacing between sentences
+    cleaned = cleaned.replace(/\.(?=[A-Z])/g, '. ');
+    
+    // Add double newlines before common section headers
+    cleaned = cleaned.replace(/(However,|Additionally,|Furthermore,|In conclusion,|For example,|Note:|Important:)/gi, '\n\n$1');
+    
+    // Format numbered lists
+    cleaned = cleaned.replace(/(\d+)\.\s*/g, '\n$1. ');
+    
+    // Format bullet points
+    cleaned = cleaned.replace(/([•·▪▫◦‣⁃])\s*/g, '\n- ');
+    
+    // Remove multiple consecutive newlines (more than 2)
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    
+    // Ensure the response doesn't start with newlines
+    cleaned = cleaned.replace(/^\n+/, '');
+    
+    return cleaned;
+  };
+
   const handleRAGChat = async (userMessage: string) => {
     try {
       // Prepare conversation history for chat mode
@@ -129,7 +234,9 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       const data = await response.json();
       console.log('✅ RAG Chat response received:', data);
       
-      return data.response || 'Sorry, I couldn\'t generate a response from the knowledge base.';
+      // Clean and format the response before returning
+      const formattedResponse = cleanAndFormatResponse(data.response || 'Sorry, I couldn\'t generate a response from the knowledge base.');
+      return formattedResponse;
     } catch (error) {
       console.error('❌ Error calling RAG chat API:', error);
       throw error;
@@ -158,7 +265,9 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       const data = await response.json();
       console.log('✅ RAG Search response received:', data);
       
-      return data.response || 'No results found for your search.';
+      // Clean and format the response before returning
+      const formattedResponse = cleanAndFormatResponse(data.response || 'No results found for your search.');
+      return formattedResponse;
     } catch (error) {
       console.error('❌ Error calling RAG search API:', error);
       throw error;
@@ -403,7 +512,7 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
                   <User size={16} className="text-white mt-0.5 flex-shrink-0" />
                 )}
                 <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                  <MessageContent text={message.text} sender={message.sender} />
                   <p className={`text-xs mt-2 ${
                     message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
                   }`}>

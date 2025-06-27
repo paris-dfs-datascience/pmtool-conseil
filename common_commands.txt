@@ -14,7 +14,7 @@ gcloud run deploy lma-chat-api \
   --max-instances 1
 
 git add .
-git commit -m "added SWOT analysis prompting"
+git commit -m "added McKinsey Framework analysis prompting and fixed formatting in RAG"
 git push -u origin main
 
 

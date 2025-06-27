@@ -13,7 +13,7 @@ const consultingFrameworks = [
     description: 'A framework for analyzing industry competitiveness and profitability potential. It evaluates five key forces: competitive rivalry, supplier power, buyer power, threat of substitutes, and barriers to entry.'
   },
   {
-    name: 'McKinsey 7-S Framework',
+    name: 'McKinsey 7S Framework',
     description: 'A holistic model for analyzing organizational effectiveness through seven interconnected elements. It examines both hard elements (Strategy, Structure, Systems) and soft elements (Shared Values, Style, Staff, Skills).'
   },
   {
@@ -108,7 +108,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
     const frameworkEndpoints: Record<string, string> = {
       'SWOT Analysis': `${API_BASE}/frameworks/swot/chat`,
       'Porter\'s Five Forces': `${API_BASE}/frameworks/porters/chat`, // Will be available when implemented
-      'McKinsey 7-S Framework': `${API_BASE}/frameworks/mckinsey-7s/chat`, // Will be available when implemented
+      'McKinsey 7S Framework': `${API_BASE}/frameworks/mckinsey_7s/chat`,
       'Balanced Scorecard': `${API_BASE}/frameworks/balanced-scorecard/chat`, // Will be available when implemented
       'Root Cause Analysis (5 Whys)': `${API_BASE}/frameworks/root-cause/chat`, // Will be available when implemented
       'Issue Tree/Logic Tree': `${API_BASE}/frameworks/issue-tree/chat` // Will be available when implemented
@@ -167,16 +167,27 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
       const response = await fetch(`${API_BASE}/frameworks/frameworks/list`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Frameworks Response:', data);
+        console.log('🔍 RAW Frameworks Response:', JSON.stringify(data, null, 2));
+        
+        // Check what's in available_frameworks
+        console.log('🔍 Available frameworks object:', data.available_frameworks);
+        console.log('🔍 Available frameworks keys:', Object.keys(data.available_frameworks || {}));
+        console.log('🔍 Available frameworks values:', Object.values(data.available_frameworks || {}));
+        
         const backendFrameworks = Object.values(data.available_frameworks || {});
+        console.log('🔍 Processed backend frameworks:', backendFrameworks);
+        
         if (backendFrameworks.length > 0) {
+          console.log('✅ Setting available frameworks from backend');
           setAvailableFrameworks(backendFrameworks as any[]);
+        } else {
+          console.log('⚠️ No backend frameworks found, using default list');
         }
       } else {
-        console.warn('Failed to fetch frameworks, using default list');
+        console.warn('❌ Failed to fetch frameworks, using default list. Status:', response.status);
       }
     } catch (error) {
-      console.warn('Could not fetch frameworks from backend, using default list:', error);
+      console.warn('❌ Could not fetch frameworks from backend, using default list:', error);
     }
   };
 
@@ -212,6 +223,15 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
       
       if (selectedFramework === 'SWOT Analysis') {
         // SWOT Analysis specific payload
+        requestPayload = {
+          messages: conversationHistory,
+          enable_grounding: enableGrounding,
+          business_context: `Chat conversation context`,
+          temperature: 0.7,
+          max_tokens: 2000
+        };
+      } else if (selectedFramework === 'McKinsey 7S Framework') {
+        // McKinsey 7S specific payload
         requestPayload = {
           messages: conversationHistory,
           enable_grounding: enableGrounding,
@@ -259,7 +279,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
       console.log('API Response:', data);
       
       // Handle both basic chat and framework-specific responses
-      const responseText = data.response || data.text || 'Sorry, I couldn\'t generate a response.';
+      const responseText = data.message?.content || data.response || data.text || 'Sorry, I couldn\'t generate a response.';
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -330,7 +350,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
     // Add a system message about framework selection
     const frameworkMessage: Message = {
       id: Date.now().toString(),
-      text: `🎯 Switched to **${frameworkName}** framework. I'm now ready to provide specialized analysis and guidance using this methodology. ${enableGrounding && frameworkName === 'SWOT Analysis' ? 'Real-time market research is enabled.' : ''}`,
+      text: `🎯 Switched to **${frameworkName}** framework. I'm now ready to provide specialized analysis and guidance using this methodology. ${enableGrounding && (frameworkName === 'SWOT Analysis' || frameworkName === 'McKinsey 7S Framework') ? 'Real-time market research is enabled.' : ''}`,
       sender: 'assistant',
       timestamp: new Date(),
       framework: frameworkName
@@ -340,10 +360,21 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
   };
 
   const getFrameworkStatus = (frameworkName: string) => {
-    // Only SWOT Analysis is currently implemented
-    if (frameworkName === 'SWOT Analysis' && apiStatus.connected) {
+    console.log('🔍 Checking status for framework:', frameworkName);
+    console.log('🔍 API connected:', apiStatus.connected);
+    console.log('🔍 Available frameworks from backend:', availableFrameworks.map(f => f.name));
+    
+    // Check if this framework exists in the backend response
+    const existsInBackend = availableFrameworks.some(f => f.name === frameworkName);
+    console.log('🔍 Framework exists in backend:', existsInBackend);
+    
+    // Both SWOT Analysis and McKinsey 7S Framework are now implemented
+    if ((frameworkName === 'SWOT Analysis' || frameworkName === 'McKinsey 7S Framework') && apiStatus.connected) {
+      console.log('✅ Framework marked as available:', frameworkName);
       return 'available';
     }
+    
+    console.log('❌ Framework marked as unavailable:', frameworkName);
     return 'unavailable';
   };
 
@@ -411,7 +442,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
                   Clear
                 </button>
                 
-                {selectedFramework === 'SWOT Analysis' && (
+                {(selectedFramework === 'SWOT Analysis' || selectedFramework === 'McKinsey 7S Framework') && (
                   <label className="flex items-center space-x-1 text-xs">
                     <input
                       type="checkbox"
@@ -431,7 +462,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
         <div className="mt-2 text-xs text-gray-500">
           API Base: {API_BASE} | Endpoint: {chatEndpoint.replace(API_BASE, '')}
           {selectedFramework && ` | Framework: ${selectedFramework}`}
-          {enableGrounding && selectedFramework === 'SWOT Analysis' && ' | Grounding: ON'}
+          {enableGrounding && (selectedFramework === 'SWOT Analysis' || selectedFramework === 'McKinsey 7S Framework') && ' | Grounding: ON'}
         </div>
 
         {/* Error Message */}
@@ -453,45 +484,45 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
         <div className="border-b border-gray-200 bg-gray-50 p-4 max-h-64 overflow-y-auto">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Choose a Consulting Framework:</h3>
           <div className="space-y-2">
-            {availableFrameworks.map((framework, index) => {
-              const status = getFrameworkStatus(framework.name);
-              return (
-                <div key={index} className="relative">
-                  <button
-                    onClick={() => handleFrameworkSelect(framework.name)}
-                    onMouseEnter={() => setHoveredFramework(framework.name)}
-                    onMouseLeave={() => setHoveredFramework('')}
-                    disabled={status === 'unavailable'}
-                    className={`w-full text-left px-3 py-2 text-sm border rounded-lg transition-all duration-200 ${
-                      status === 'unavailable'
-                        ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : selectedFramework === framework.name
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white hover:bg-gray-100 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{framework.name}</span>
-                      {status === 'available' && (
-                        <span className="text-green-500 text-xs">● Available</span>
-                      )}
-                      {status === 'unavailable' && (
-                        <span className="text-gray-400 text-xs">○ Coming Soon</span>
-                      )}
-                    </div>
-                  </button>
-                  
-                  {hoveredFramework === framework.name && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-gray-800 text-white p-3 rounded-lg shadow-lg">
-                      <p className="text-xs leading-relaxed">{framework.description}</p>
-                      {status === 'unavailable' && (
-                        <p className="text-xs text-red-300 mt-1">Framework implementation coming soon</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          {availableFrameworks.map((framework, index) => {
+            const status = getFrameworkStatus(framework.name);
+            return (
+              <div key={index} className="relative">
+                <button
+                  onClick={() => handleFrameworkSelect(framework.name)}
+                  onMouseEnter={() => setHoveredFramework(framework.name)}
+                  onMouseLeave={() => setHoveredFramework('')}
+                  disabled={status === 'unavailable'}
+                  className={`w-full text-left px-3 py-2 text-sm border rounded-lg transition-all duration-200 ${
+                    status === 'unavailable'
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : selectedFramework === framework.name
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 bg-white hover:bg-gray-100 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{framework.name}</span>
+                    {status === 'available' && (
+                      <span className="text-green-500 text-xs">● Available</span>
+                    )}
+                    {status === 'unavailable' && (
+                      <span className="text-gray-400 text-xs">○ Coming Soon</span>
+                    )}
+                  </div>
+                </button>
+
+                {hoveredFramework === framework.name && (
+                  <div className="absolute left-0 right-0 bottom-full mb-1 z-10 bg-gray-800 text-white p-3 rounded-lg shadow-lg">
+                    <p className="text-xs leading-relaxed">{framework.description}</p>
+                    {status === 'unavailable' && (
+                      <p className="text-xs text-red-300 mt-1">Framework implementation coming soon</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           </div>
         </div>
       )}
@@ -550,7 +581,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
                 <Loader2 size={16} className="animate-spin" />
                 <p className="text-sm">
                   {selectedFramework 
-                    ? `Analyzing with ${selectedFramework}${enableGrounding && selectedFramework === 'SWOT Analysis' ? ' + real-time data' : ''}...`
+                    ? `Analyzing with ${selectedFramework}${enableGrounding && (selectedFramework === 'SWOT Analysis' || selectedFramework === 'McKinsey 7S Framework') ? ' + real-time data' : ''}...`
                     : apiStatus.connected ? 'Thinking...' : 'Connecting...'
                   }
                 </p>
@@ -603,7 +634,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
                 ? `Ready to chat${selectedFramework ? ` • ${selectedFramework} active` : ''}`
                 : 'Click Test to check connection'
               }
-              {enableGrounding && selectedFramework === 'SWOT Analysis' && ' • Real-time data enabled'}
+              {enableGrounding && (selectedFramework === 'SWOT Analysis' || selectedFramework === 'McKinsey 7S Framework') && ' • Real-time data enabled'}
             </>
           )}
         </div>
