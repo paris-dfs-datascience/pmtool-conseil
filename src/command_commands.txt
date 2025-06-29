@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "Added Mistral OCR tool. Moved sign in button on sidebar to end of nav links."
+git commit -m "Updated the homepage with sections after CTA"
 git push -u origin main

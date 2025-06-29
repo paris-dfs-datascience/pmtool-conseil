@@ -5,6 +5,7 @@ import VideoPlayer from '../components/VideoPlayer';
 import InteractiveLMADiagram from '../components/HomePageComponents/ConseilInteractiveDiagram';
 import DemoSignup from '../components/HomePageComponents/demo';
 import Bio from '../components/HomePageComponents/bio';
+import ConsultingOverview from '../components/HomePageComponents/summary';
 
 interface User {
   displayName?: string | null;
@@ -38,6 +39,8 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
           <Bio />
         </div>
       </div>
+      <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
+        <ConsultingOverview />
       </div>
   );
 };
