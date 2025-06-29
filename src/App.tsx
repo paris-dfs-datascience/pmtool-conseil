@@ -10,6 +10,7 @@ import LMAPage from './pages/LMAPage';
 import GraphitePage from './pages/GraphitePage';
 import CatalantPage from './pages/CatalantPage';
 import DocumentAI from './pages/DocumentAI';
+import OCRToolPage from './pages/OCRPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
 import ClaudeInterface from './components/GeneralChats/ClaudeChat';
 import Sidebar from './components/Sidebar';
@@ -111,6 +112,11 @@ function App() {
             '⚡ Code Assistant',
             'AI-powered coding companion for technical consulting and development projects.'
           );
+        case 'ocr':
+          return renderPreviewPage(
+              '⚡ OCR Tool AI',
+              'OCR Tool for Document Analysis'
+            );
         case 'documentai':
           return renderPreviewPage(
               '⚡ Document AI',
@@ -140,7 +146,9 @@ function App() {
         return <CatalantPage />;
       case 'code':
         return <GitHubCodeAssistantPage />;
-        case 'documentai':
+      case 'ocr':
+          return <OCRToolPage />;
+      case 'documentai':
           return <DocumentAI />;
       default:
         return (

@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState } from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, Notebook } from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, Notebook, ScanSearch} from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -40,6 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
     { id: 'graphite', icon: PenTool, label: 'Graphite Assistant' },
     { id: 'catalant', icon: Briefcase, label: 'Catalant Assistant' },
     { id: 'code', icon: Code, label: 'Code Assistant' },
+    { id: 'ocr', icon: ScanSearch, label: 'OCR-Mistral' },
     { id: 'documentai', icon: Notebook, label: 'Document AI' },
   ];
 
@@ -71,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex flex-col px-2">
+        {/* Navigation Items */}
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -92,76 +94,73 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
             </button>
           );
         })}
-      </div>
 
-      {/* Spacer to push auth section to bottom */}
-      <div className="flex-1"></div>
-
-      {/* Auth Section at Bottom of Sidebar */}
-      <div className="flex flex-col px-2 space-y-2">
-        {user ? (
-          <>
-            {/* User Avatar */}
-            <div className="flex items-center p-2 rounded-lg">
-              <div className="flex-shrink-0">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt="Profile"
-                    className="w-10 h-10 rounded-full border-2 border-gray-200"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                    <User size={20} className="text-white" />
+        {/* Auth Section - Now directly after navigation items */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          {user ? (
+            <>
+              {/* User Avatar */}
+              <div className="flex items-center p-2 rounded-lg mb-2">
+                <div className="flex-shrink-0">
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt="Profile"
+                      className="w-10 h-10 rounded-full border-2 border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                      <User size={20} className="text-white" />
+                    </div>
+                  )}
+                </div>
+                
+                <div 
+                  className={`ml-3 min-w-0 transition-all duration-300 ${
+                    isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
+                  }`}
+                >
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {user.displayName}
                   </div>
-                )}
+                  <div className="text-xs text-gray-500 truncate">
+                    {user.email}
+                  </div>
+                </div>
               </div>
               
-              <div 
-                className={`ml-3 min-w-0 transition-all duration-300 ${
-                  isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
-                }`}
+              {/* Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                className="flex items-center p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors w-full"
               >
-                <div className="text-sm font-medium text-gray-900 truncate">
-                  {user.displayName}
-                </div>
-                <div className="text-xs text-gray-500 truncate">
-                  {user.email}
-                </div>
-              </div>
-            </div>
-            
-            {/* Sign Out Button */}
+                <LogOut size={20} className="flex-shrink-0" />
+                <span 
+                  className={`ml-3 text-sm font-medium transition-all duration-300 ${
+                    isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
+                  }`}
+                >
+                  Sign Out
+                </span>
+              </button>
+            </>
+          ) : (
+            /* Sign In Button */
             <button
-              onClick={handleSignOut}
-              className="flex items-center p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors w-full"
+              onClick={signInWithGoogle}
+              className="flex items-center p-3 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors w-full"
             >
-              <LogOut size={20} className="flex-shrink-0" />
+              <LogIn size={20} className="flex-shrink-0" />
               <span 
                 className={`ml-3 text-sm font-medium transition-all duration-300 ${
                   isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                 }`}
               >
-                Sign Out
+                Sign In
               </span>
             </button>
-          </>
-        ) : (
-          /* Sign In Button */
-          <button
-            onClick={signInWithGoogle}
-            className="flex items-center p-3 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors w-full"
-          >
-            <LogIn size={20} className="flex-shrink-0" />
-            <span 
-              className={`ml-3 text-sm font-medium transition-all duration-300 ${
-                isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
-              }`}
-            >
-              Sign In
-            </span>
-          </button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
