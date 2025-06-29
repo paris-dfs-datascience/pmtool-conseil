@@ -474,7 +474,7 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
         
         {/* API URL Display */}
         <div className="mt-2 text-xs text-gray-500">
-          API: {searchMode === 'chat' ? chatEndpoint : searchEndpoint}
+          API: LMA Knowledge Base with Gemini Pro 2.0
         </div>
         
         {/* Error Message */}

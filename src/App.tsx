@@ -9,11 +9,13 @@ import ConsultingChat from './components/ConsultingFrameworks/ConsultingChat';
 import LMAPage from './pages/LMAPage';
 import GraphitePage from './pages/GraphitePage';
 import CatalantPage from './pages/CatalantPage';
+import DocumentAI from './pages/DocumentAI';
 import UnauthorizedPage from './components/UnauthorizedPage';
 import ClaudeInterface from './components/GeneralChats/ClaudeChat';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import './index.css'; // Import the Tailwind CSS file
+import { format } from 'path';
 
 interface User {
   displayName?: string | null;
@@ -109,6 +111,11 @@ function App() {
             '⚡ Code Assistant',
             'AI-powered coding companion for technical consulting and development projects.'
           );
+        case 'documentai':
+          return renderPreviewPage(
+              '⚡ Document AI',
+              'AI for common documents'
+            );
         default:
           return renderPreviewPage('🔒 Protected Area', 'This section requires authentication.');
       }
@@ -133,6 +140,8 @@ function App() {
         return <CatalantPage />;
       case 'code':
         return <GitHubCodeAssistantPage />;
+        case 'documentai':
+          return <DocumentAI />;
       default:
         return (
           <div className="flex items-center justify-center h-full">

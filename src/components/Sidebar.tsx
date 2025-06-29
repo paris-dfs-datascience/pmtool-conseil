@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState } from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList } from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, Notebook } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -40,6 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
     { id: 'graphite', icon: PenTool, label: 'Graphite Assistant' },
     { id: 'catalant', icon: Briefcase, label: 'Catalant Assistant' },
     { id: 'code', icon: Code, label: 'Code Assistant' },
+    { id: 'documentai', icon: Notebook, label: 'Document AI' },
   ];
 
   const getButtonClasses = (itemId: string, alwaysEnabled = false) => {

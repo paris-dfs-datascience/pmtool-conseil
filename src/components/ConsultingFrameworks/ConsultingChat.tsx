@@ -460,7 +460,7 @@ const ConsultingChat: React.FC<ConsultingChatProps> = ({
 
         {/* API URL Display */}
         <div className="mt-2 text-xs text-gray-500">
-          API Base: {API_BASE} | Endpoint: {chatEndpoint.replace(API_BASE, '')}
+          Model: Gemini Pro 2.0
           {selectedFramework && ` | Framework: ${selectedFramework}`}
           {enableGrounding && (selectedFramework === 'SWOT Analysis' || selectedFramework === 'McKinsey 7S Framework') && ' | Grounding: ON'}
         </div>

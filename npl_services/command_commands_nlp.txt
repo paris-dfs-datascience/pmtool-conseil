@@ -1,0 +1,12 @@
+# Build and push to Container Registry
+gcloud builds submit --tag gcr.io/lma-website-461920/nlp-services
+
+# Deploy to Cloud Run
+gcloud run deploy nlp-services \
+  --image gcr.io/lma-website-461920/nlp-services \
+  --region us-central1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --memory 8Gi \
+  --cpu 2 \
+  --max-instances 1

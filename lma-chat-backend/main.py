@@ -21,11 +21,15 @@ logger = logging.getLogger(__name__)
 
 # Import existing routers with error handling
 try:
-    from ChatBasic import router as basic_router
-    logger.info("✅ ChatBasic router imported successfully")
+    from chat import router as basic_router  # Updated to use chat.py
+    logger.info("✅ chat router imported successfully")
 except Exception as e:
-    logger.error(f"❌ Failed to import ChatBasic router: {e}")
-    basic_router = None
+    try:
+        from ChatBasic import router as basic_router  # Fallback to original name
+        logger.info("✅ ChatBasic router imported successfully (fallback)")
+    except Exception as e2:
+        logger.error(f"❌ Failed to import both chat and ChatBasic routers: {e}, {e2}")
+        basic_router = None
 
 try:
     from ChatRAG import router as rag_router
@@ -197,7 +201,7 @@ except ImportError as e:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("🚀 Starting up LMA Chat API with GitHub Code Assistant, Google GenAI, and Consulting Frameworks")
+    logger.info("🚀 Starting up LMA Chat API with PDF Support, GitHub Code Assistant, Google GenAI, and Consulting Frameworks")
     
     # Log framework status
     if frameworks_available:
@@ -219,9 +223,9 @@ async def lifespan(app: FastAPI):
     logger.info("⛔ Shutting down LMA Chat API")
 
 app = FastAPI(
-    title="LMA Chat API",
-    description="API with Google GenAI basic chat, RAG-enhanced chat, consulting pitch generation, GitHub code assistance, and consulting frameworks",
-    version="1.3.0",  # Bumped version for frameworks addition
+    title="LMA Chat API with PDF Support",
+    description="API with Google GenAI basic chat, PDF support, RAG-enhanced chat, consulting pitch generation, GitHub code assistance, and consulting frameworks",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -347,14 +351,14 @@ def root():
     framework_status = get_framework_status()
     
     return JSONResponse(content={
-        "message": "LMA Chat API is running!",
-        "version": "1.3.0",
+        "message": "LMA Chat API with PDF Support is running!",
+        "version": "2.0.0",
         "services": {
             "basic_llm": {
-                "description": "Google GenAI Gemini 2.5 Pro chat with advanced thinking capabilities",
+                "description": "Google GenAI Gemini 2.5 Pro chat with PDF support and advanced thinking capabilities",
                 "base_path": "/basic",
                 "model": "gemini-2.5-pro",
-                "features": ["thinking_mode", "structured_output", "streaming"]
+                "features": ["thinking_mode", "structured_output", "streaming", "pdf_support", "multimodal"]
             },
             "rag_engine": {
                 "description": "RAG-enhanced chat with knowledge base",
@@ -398,10 +402,14 @@ def root():
             }
         },
         "endpoints": {
-            # Existing endpoints
+            # Basic chat endpoints with PDF support
             "basic_chat": "/basic/chat",
+            "basic_chat_with_files": "/basic/chat/with-files",  # NEW
+            "basic_upload_file": "/basic/upload-file",  # NEW
             "basic_chat_stream": "/basic/chat/stream",
             "basic_status": "/basic/status",
+            
+            # Existing endpoints
             "rag_chat": "/rag/chat",
             "rag_status": "/rag/status",
             "consulting_pitch": "/consulting/generate-pitch",
@@ -420,7 +428,7 @@ def root():
             "claude_chat_stream": "/claude/chat/claude/stream",
             "claude_status": "/claude/status/claude",
             
-            # New consulting frameworks endpoints
+            # Consulting frameworks endpoints
             "frameworks_status": "/frameworks/frameworks/status",
             "frameworks_list": "/frameworks/frameworks/list",
         },
@@ -451,14 +459,14 @@ async def health():
         return JSONResponse(content={
             "status": "healthy",
             "services": {
-                "basic_llm": "operational - Google GenAI",
+                "basic_llm": "operational - Google GenAI with PDF support",
                 "rag_engine": "operational",
                 "consulting_pitch": "operational",
                 "github_code_assistant": "operational" if github_router else "unavailable",
                 "claude_chat": "operational" if claude_router else "unavailable",
                 "consulting_frameworks": f"operational - {framework_status.get('available_frameworks', 0)}/{framework_status.get('total_frameworks', 0)} frameworks" if frameworks_available else "unavailable"
             },
-            "version": "1.3.0",
+            "version": "2.0.0",
             "infrastructure": {
                 "google_genai": "connected",
                 "vertex_ai": "connected",
@@ -487,10 +495,11 @@ async def debug_routes():
     return {
         "total_routes": len(routes),
         "routes": routes,
+        "basic_routes": [r for r in routes if r["path"].startswith("/basic")],
         "github_routes": [r for r in routes if r["path"].startswith("/github")],
         "claude_routes": [r for r in routes if r["path"].startswith("/claude")],
         "framework_routes": [r for r in routes if r["path"].startswith("/frameworks")],
-        "framework_count": len([r for r in routes if r["path"].startswith("/frameworks")])
+        "framework_count": len([r for r in routes if r["path"].startswith("/frameworks")]),
     }
 
 @app.exception_handler(404)
@@ -521,10 +530,14 @@ async def not_found_handler(request, exc):
         "/docs",
         "/debug/routes",
         
-        # Existing service endpoints
+        # Basic chat endpoints with NEW PDF support
         "/basic/chat",
+        "/basic/chat/with-files",  # NEW - PDF and file support
+        "/basic/upload-file",      # NEW - File upload testing
         "/basic/chat/stream",
         "/basic/status",
+        
+        # Existing service endpoints
         "/rag/chat",
         "/rag/status",
         "/consulting/generate-pitch",
@@ -559,8 +572,14 @@ async def not_found_handler(request, exc):
             "method": request.method,
             "debug_url": "/debug/routes",
             "frameworks_status_url": "/frameworks/frameworks/status",
+            "pdf_support_note": "PDF and file upload support available at /basic/chat/with-files",
             "available_endpoints": available_endpoints,
-            "framework_endpoints_note": "Framework-specific endpoints available at /frameworks/{framework_name}/*"
+            "framework_endpoints_note": "Framework-specific endpoints available at /frameworks/{framework_name}/*",
+            "new_features": [
+                "PDF file support via /basic/chat/with-files",
+                "File upload testing via /basic/upload-file",
+                "Multimodal chat capabilities"
+            ]
         }
     )
 
@@ -573,7 +592,7 @@ if __name__ == "__main__":
     reload = os.environ.get("RELOAD", "false").lower() == "true"
     log_level = os.environ.get("LOG_LEVEL", "info").lower()
 
-    logger.info(f"🚀 Starting server on {host}:{port} with Google GenAI integration and Consulting Frameworks")
+    logger.info(f"🚀 Starting server on {host}:{port} with PDF Support, Google GenAI integration and Consulting Frameworks")
 
     uvicorn.run(
         "main:app",

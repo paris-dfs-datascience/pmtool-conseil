@@ -4,6 +4,7 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-multipart==0.0.6
 anthropic[vertex]
+python-json-logger==2.0.7
 
 # HTTP client
 httpx==0.25.2
@@ -22,9 +23,6 @@ google-genai>=0.8.0
 
 # Environment and configuration
 python-dotenv==1.0.0
-
-# Additional utilities
-python-json-logger==2.0.7
 
 # GitHub Code Assistant dependencies
 google-cloud-secret-manager>=2.16.0

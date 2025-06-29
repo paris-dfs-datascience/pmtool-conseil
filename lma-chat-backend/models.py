@@ -39,6 +39,56 @@ class ChatResponse(BaseModel):
     response: str = Field(..., description="Generated response text")
     status: Literal["success", "error"] = Field(..., description="Response status")
 
+# FILE SUPPORT MODELS - NEW ADDITIONS
+
+class FileAttachment(BaseModel):
+    """Model for file attachments"""
+    filename: str = Field(..., description="Original filename")
+    content: str = Field(..., description="File content (text) or base64 (binary)")
+    size: int = Field(..., gt=0, description="File size in bytes")
+    mime_type: str = Field(..., description="MIME type of the file")
+    
+    @validator('filename')
+    def validate_filename(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Filename cannot be empty")
+        return v.strip()
+
+class ChatMessage(BaseModel):
+    """Enhanced message model with optional file attachments"""
+    role: str = Field(..., description="Message role (user/assistant)")
+    content: str = Field(..., description="Message content")
+    files: Optional[List[FileAttachment]] = Field(default=None, description="Optional file attachments")
+    
+    @validator('role')
+    def validate_role(cls, v):
+        if v not in ['user', 'assistant', 'system']:
+            raise ValueError("Role must be 'user', 'assistant', or 'system'")
+        return v
+
+class FileChatRequest(BaseModel):
+    """Request model for chat with files"""
+    message: str = Field(..., min_length=1, description="User message")
+    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+    max_tokens: Optional[int] = Field(default=4096, gt=0, le=65535, description="Maximum tokens to generate")
+    files: Optional[List[FileAttachment]] = Field(default=None, description="Optional file attachments")
+    
+    @validator('message')
+    def validate_message(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Message cannot be empty")
+        return v.strip()
+
+class FileUploadResponse(BaseModel):
+    """Response model for file uploads"""
+    filename: str = Field(..., description="Uploaded filename")
+    size: int = Field(..., description="File size in bytes")
+    content: str = Field(..., description="File content preview or status")
+    mime_type: str = Field(..., description="File MIME type")
+    status: Literal["success", "error"] = Field(..., description="Upload status")
+
+# EXISTING RAG MODELS
+
 class RAGRequest(BaseModel):
     """Request model for RAG endpoints"""
     query: str = Field(..., min_length=1, max_length=1000, description="Search query for RAG system")

@@ -222,7 +222,7 @@ const ClaudeInterface: React.FC<ChatInterfaceProps> = ({
 
         {/* API URL Display */}
         <div className="mt-2 text-xs text-gray-500">
-          Mode: BASIC | API: {chatEndpoint}
+          Mode: Claude Chat |  Model: Claude Opus
         </div>
 
         {/* Error Message */}
