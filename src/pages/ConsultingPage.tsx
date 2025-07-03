@@ -1,34 +1,29 @@
 // src/pages/ConsultingPage.tsx
 import React, { useState } from 'react';
-import ConsultingChat from '../components/ConsultingFrameworks/ConsultingChat';
-import ConsultingFrameworks from '../components/ConsultingFrameworks/ConsultingFrameworks';
+import ConsultingChat from '../components/ConsultingFrameworkChat';
+import { Message } from '../components/ConsultingFrameworkChat/types';
+import { AuthContext } from '../types/auth';
 
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'assistant';
-  timestamp: Date;
-  framework?: string;
+interface ConsultingPageProps {
+  authContext?: AuthContext;
 }
 
-const ConsultingPage: React.FC = () => {
-  const [messageCount, setMessageCount] = useState(1); // Start with 1 for the initial assistant message
+const ConsultingPage: React.FC<ConsultingPageProps> = ({ authContext }) => {
+  const [messageCount, setMessageCount] = useState(1);
 
   const handleNewMessage = (message: Message) => {
     setMessageCount(prev => prev + 1);
   };
 
   return (
-    <div className="flex h-full">
-      {/* Chat Interface - 2/3 width */}
-      <div className="w-2/3 border-r border-gray-200">
-        <ConsultingChat onNewMessage={handleNewMessage} />
-      </div>
-      
-      {/* Frameworks - 1/3 width */}
-      <div className="w-1/3">
-        <ConsultingFrameworks messageCount={messageCount} />
-      </div>
+    <div className="h-full">
+      <ConsultingChat 
+        onNewMessage={handleNewMessage}
+        firebaseToken={authContext?.firebaseToken || null}
+        firebaseUser={authContext?.firebaseUser || null}
+        onAuthRequired={authContext?.onAuthRequired || (() => console.log('Auth required'))}
+        onSignOut={authContext?.onSignOut || (() => console.log('Sign out'))}
+      />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React from 'react';
 import HeroSection from '../components/HomePageComponents/HeroSection';
 import ConseilSection from '../components/HomePageComponents/ConseilSection';
-import VideoPlayer from '../components/VideoPlayer';
+import LoomVideo from '../components/LoomVideo'; // Updated import
 import InteractiveLMADiagram from '../components/HomePageComponents/ConseilInteractiveDiagram';
 import DemoSignup from '../components/HomePageComponents/demo';
 import Bio from '../components/HomePageComponents/bio';
@@ -19,15 +19,16 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
-  const youtubeUrl = 'https://youtu.be/Yi9sYqIrLNk'; // Example URL
   return (
-    
     <div>
       <HeroSection user={user} />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <ConseilSection />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
-      <VideoPlayer url={youtubeUrl} />    
+      <LoomVideo 
+        videoId="861f3ab8f7be41b592900fb0487f5746"
+        sid="eed6c455-c340-4152-855c-c595cd3d2294"
+      />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <InteractiveLMADiagram />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
@@ -40,8 +41,8 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
         </div>
       </div>
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
-        <ConsultingOverview />
-      </div>
+      <ConsultingOverview />
+    </div>
   );
 };
 

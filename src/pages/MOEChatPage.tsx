@@ -1,6 +1,6 @@
-// src/pages/LMAPage.tsx
+// src/pages/MOEChatPage.tsx
 import React, { useState } from 'react';
-import RAGChatInterface from '../components/LMARagChat/RAGChatInterface';
+import MOEChatInterface from '../components/GeneralChats/MoE';
 import PromptLibrary from '../components/GeneralChats/PromptLibrary';
 import { AuthContext } from '../types/auth';
 
@@ -11,11 +11,11 @@ interface Message {
   timestamp: Date;
 }
 
-interface LMAPageProps {
+interface MOEChatPageProps {
   authContext?: AuthContext;
 }
 
-const LMAPage: React.FC<LMAPageProps> = ({ authContext }) => {
+const MOEChatPage: React.FC<MOEChatPageProps> = ({ authContext }) => {
   const [messageCount, setMessageCount] = useState(1); // Start with 1 for the initial assistant message
   const [selectedPrompt, setSelectedPrompt] = useState<string>('');
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
@@ -39,27 +39,20 @@ const LMAPage: React.FC<LMAPageProps> = ({ authContext }) => {
     setSelectedPromptId(null);
   };
 
-  // Create a modified authContext if needed, or use the default one
-  const chatAuthContext: AuthContext = authContext || {
-    firebaseToken: null,
-    firebaseUser: null,
-    onSignOut: () => {},
-    onAuthRequired: () => {}
-  };
-
   return (
     <div className="flex h-full">
       {/* Chat Interface - 2/3 width */}
       <div className="w-2/3 border-r border-gray-200">
-        <RAGChatInterface
+        <MOEChatInterface 
           onNewMessage={handleNewMessage}
-          authContext={chatAuthContext}
-          placeholder={
-            selectedPrompt 
-              ? `Selected prompt: "${selectedPrompt.slice(0, 50)}${selectedPrompt.length > 50 ? '...' : ''}" - Press Enter to send or modify first`
-              : 'Ask me anything about LMA... (Press Enter to send, Shift+Enter for new line)'
-          }
-          welcomeMessage="Hello! I'm your LMA Knowledge Assistant powered by RAG technology. I can help you find information from our knowledge base. Select a prompt from the library or ask me anything!"
+          selectedPrompt={selectedPrompt}
+          onPromptSent={clearSelectedPrompt}
+          
+          // Pass Firebase auth props to MOEChatInterface
+          firebaseToken={authContext?.firebaseToken}
+          firebaseUser={authContext?.firebaseUser}
+          onAuthRequired={authContext?.onAuthRequired}
+          onSignOut={authContext?.onSignOut}
         />
       </div>
       
@@ -74,4 +67,4 @@ const LMAPage: React.FC<LMAPageProps> = ({ authContext }) => {
   );
 };
 
-export default LMAPage;
+export default MOEChatPage;

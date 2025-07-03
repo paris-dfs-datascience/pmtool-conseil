@@ -6,6 +6,7 @@ python-multipart==0.0.6
 anthropic[vertex]
 python-json-logger==2.0.7
 
+
 # HTTP client
 httpx==0.25.2
 
@@ -13,6 +14,7 @@ httpx==0.25.2
 google-auth==2.25.2
 google-auth-oauthlib==1.1.0
 google-cloud-aiplatform==1.67.0
+firebase-admin
 
 # Vertex AI for your existing routers
 vertexai==1.67.0
@@ -27,3 +29,6 @@ python-dotenv==1.0.0
 # GitHub Code Assistant dependencies
 google-cloud-secret-manager>=2.16.0
 aiofiles>=23.0.0
+
+#Huggingface
+huggingface_hub>=0.20.0

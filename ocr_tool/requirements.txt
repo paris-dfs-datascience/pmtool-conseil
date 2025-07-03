@@ -1,6 +1,28 @@
-# requirements.txt
+# Core FastAPI and server dependencies
 fastapi==0.104.1
-uvicorn[standard]==0.24.0
+uvicorn==0.24.0
 python-multipart==0.0.6
-pydantic==2.5.0
+
+# Firebase Authentication
+firebase-admin==6.2.0
+
+# HTTP and requests
 requests==2.31.0
+httpx==0.25.2
+
+# Data validation and serialization
+pydantic==2.5.0
+
+# Date and time handling
+python-dateutil==2.8.2
+
+# Logging and utilities
+python-json-logger==2.0.7
+
+# Google Cloud dependencies (if needed for enhanced GCP integration)
+google-cloud-core==2.3.3
+google-auth==2.23.4
+
+# Development and testing (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1

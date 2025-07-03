@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "Updated the homepage with sections after CTA"
+git commit -m "LMA v2.0, authentification added, cleaned up chats. Added Framework"
 git push -u origin main

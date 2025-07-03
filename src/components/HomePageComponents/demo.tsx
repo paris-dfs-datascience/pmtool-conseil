@@ -70,12 +70,27 @@ const DemoSignup: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Save to Firebase Firestore
+      // Save to Firebase Firestore with email fields for Trigger Email extension
       await addDoc(collection(db, 'demo_requests'), {
+        // Hardcoded email fields for the Trigger Email extension
+        to: 'matthew.paris@lemaraisadvisory.com', // Replace with your actual email
+        message: {
+          subject: 'New Demo Request',
+          html: `
+            <h2>New Demo Request</h2>
+            <p><strong>Name:</strong> ${formData.firstName} ${formData.lastName}</p>
+            <p><strong>Email:</strong> ${formData.email}</p>
+            <p><strong>Message:</strong> ${formData.message || 'No additional message provided'}</p>
+            <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
+          `,
+          text: `New Demo Request from ${formData.firstName} ${formData.lastName} (${formData.email}): ${formData.message || 'No additional message provided'}`
+        },
+        
+        // Your existing fields (keeping the same structure)
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        message: formData.message,
+        additionalMessage: formData.message, // Renamed to avoid conflict
         timestamp: Timestamp.now(),
         status: 'pending'
       });

@@ -1,8 +1,13 @@
 // src/pages/GitHubCodeAssistantPage.tsx
 import React, { useState } from 'react';
 import GitHubCodeAssistant from '../components/GitHubCodeAssistant';
+import { AuthContext } from '../types/auth';
 
-const GitHubCodeAssistantPage: React.FC = () => {
+interface GitHubCodeAssistantPageProps {
+  authContext: AuthContext;
+}
+
+const GitHubCodeAssistantPage: React.FC<GitHubCodeAssistantPageProps> = ({ authContext }) => {
   const [messageCount, setMessageCount] = useState(1); // Start with 1 for the initial assistant message
   const [sessionStats, setSessionStats] = useState({
     filesCreated: 0,
@@ -59,6 +64,11 @@ const GitHubCodeAssistantPage: React.FC = () => {
           </div>
           <div className="text-xs">
             GitHub Code Assistant • Powered by Mistral Codestral
+            {authContext.firebaseUser && (
+              <span className="ml-2 text-green-600">
+                • {authContext.firebaseUser.displayName || authContext.firebaseUser.email}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -67,7 +77,8 @@ const GitHubCodeAssistantPage: React.FC = () => {
       <div className="flex-1">
         <GitHubCodeAssistant 
           onNewMessage={handleNewMessage}
-          apiEndpoint="https://lma-chat-api-443545551926.us-central1.run.app/github"
+          apiEndpoint="https://lma-chat-api-443545551926.us-central1.run.app/github_assistant"
+          authContext={authContext}
         />
       </div>
     </div>

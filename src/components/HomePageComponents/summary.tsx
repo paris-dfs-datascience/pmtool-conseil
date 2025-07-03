@@ -65,7 +65,7 @@ const ConsultingOverview = () => {
 
   const clientLogos = [
     "BNY Mellon", "Wolters Kluwer", "Penn Entertainment", "MAPFRE", 
-    "CVS Pharmacy", "BlackRock", "McKesson", "Protective Life"
+    "CVS Pharmacy", "BlackRock", "Point72", "Psych Plus"
   ];
 
   const industries = [

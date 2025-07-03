@@ -22,8 +22,11 @@ import {
   Plus,
   GitPullRequest,
   BookOpen,
-  Search
+  Search,
+  Lock,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth'; // Use the main app's useAuth hook
 
 interface Message {
   id: string;
@@ -73,19 +76,28 @@ interface GitHubUser {
   name: string;
 }
 
+export interface AuthContext {
+  firebaseToken: string | null;
+  firebaseUser: any;
+  onSignOut: () => void;
+  onAuthRequired: () => void;
+}
+
 interface CodeAssistantProps {
   onNewMessage?: (message: Message) => void;
   apiEndpoint?: string;
+  authContext: AuthContext;
 }
 
 const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({ 
   onNewMessage,
-  apiEndpoint = 'https://lma-chat-api-443545551926.us-central1.run.app/github'
+  apiEndpoint = 'https://lma-chat-api-443545551926.us-central1.run.app/github',
+  authContext
 }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your GitHub-integrated AI Code Assistant powered by Mistral Codestral. I can help you:\n\n• Generate React/Python components\n• Debug and fix code issues\n• Refactor and optimize code\n• Review code for best practices\n• Access and modify your GitHub repositories\n• Create pull requests with generated code\n\nConnect to GitHub to get started with repository-aware assistance!',
+      text: 'Hello! I\'m your GitHub-integrated AI Code Assistant powered by Mistral Codestral. I can help you:\n\n• Generate React/Python components\n• Debug and fix code issues\n• Refactor and optimize code\n• Review code for best practices\n• Access and modify your GitHub repositories\n• Create pull requests with generated code\n\nSign in to get started with repository-aware assistance!',
       sender: 'assistant',
       timestamp: new Date()
     }
@@ -98,7 +110,10 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [projectContext, setProjectContext] = useState<string>('');
   const [showQuickActions, setShowQuickActions] = useState(true);
-  const [apiStatus, setApiStatus] = useState({ connected: true });
+  const [apiStatus, setApiStatus] = useState({ 
+    connected: true, 
+    authRequired: false 
+  });
   
   // GitHub integration state
   const [githubConnected, setGithubConnected] = useState(false);
@@ -114,6 +129,12 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Use the main app's useAuth hook
+  const { user, loading: authLoading, isAuthorized } = useAuth();
+
+  // Destructure authContext
+  const { firebaseToken, firebaseUser, onSignOut, onAuthRequired } = authContext;
 
   const modes = [
     { 
@@ -233,6 +254,19 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
     }
   };
 
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (firebaseToken) {
+      headers['Authorization'] = `Bearer ${firebaseToken}`;
+    }
+    
+    return headers;
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -261,21 +295,33 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
 
   const checkApiStatus = async () => {
     try {
-      const response = await fetch(`${apiEndpoint}/status`);
+      const response = await fetch(`${apiEndpoint}/status`, {
+        headers: getAuthHeaders()
+      });
       const data = await response.json();
-      setApiStatus({ connected: response.ok && data.status === 'operational' });
+      setApiStatus({ 
+        connected: response.ok && data.status === 'operational',
+        authRequired: data.authentication_enabled || false
+      });
     } catch (error) {
       console.error('Error checking API status:', error);
-      setApiStatus({ connected: false });
+      setApiStatus({ connected: false, authRequired: false });
     }
   };
 
   // Updated GitHub API functions to use backend endpoints
   const connectGitHub = async () => {
+    if (!firebaseToken && apiStatus.authRequired) {
+      onAuthRequired();
+      return;
+    }
+
     setIsConnecting(true);
     try {
       // Check if backend has GitHub token configured
-      const response = await fetch(`${apiEndpoint}/status`);
+      const response = await fetch(`${apiEndpoint}/status`, {
+        headers: getAuthHeaders()
+      });
       const data = await response.json();
       
       if (data.configuration?.github_integration) {
@@ -294,7 +340,14 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
 
   const fetchUser = async () => {
     try {
-      const response = await fetch(`${apiEndpoint}/user`);
+      const response = await fetch(`${apiEndpoint}/user`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        onAuthRequired();
+        return;
+      }
       
       if (response.ok) {
         const user = await response.json();
@@ -310,7 +363,14 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
   const fetchRepositories = async () => {
     setIsLoadingRepos(true);
     try {
-      const response = await fetch(`${apiEndpoint}/repositories`);
+      const response = await fetch(`${apiEndpoint}/repositories`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        onAuthRequired();
+        return;
+      }
       
       if (response.ok) {
         const repos = await response.json();
@@ -334,7 +394,14 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
         path: path
       });
       
-      const response = await fetch(`${apiEndpoint}/repo-files?${params}`);
+      const response = await fetch(`${apiEndpoint}/repo-files?${params}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        onAuthRequired();
+        return;
+      }
       
       if (response.ok) {
         const files = await response.json();
@@ -357,7 +424,14 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
         file_path: file.path
       });
       
-      const response = await fetch(`${apiEndpoint}/file-content?${params}`);
+      const response = await fetch(`${apiEndpoint}/file-content?${params}`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401) {
+        onAuthRequired();
+        return null;
+      }
       
       if (response.ok) {
         const data = await response.json();
@@ -415,6 +489,12 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
   const handleSendMessage = async (customPrompt?: string) => {
     const messageText = customPrompt || inputText;
     if (!messageText.trim() || isLoading) return;
+
+    // Check authentication for protected endpoints
+    if (!firebaseToken && apiStatus.authRequired) {
+      onAuthRequired();
+      return;
+    }
 
     const currentMode = getCurrentMode();
     let finalPrompt = messageText;
@@ -495,14 +575,17 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
 
       const response = await fetch(`${apiEndpoint}/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(requestPayload),
       });
 
       // Enhanced error handling
       if (!response.ok) {
+        if (response.status === 401) {
+          onAuthRequired();
+          throw new Error('Authentication required');
+        }
+
         let errorDetails: any;
         try {
           errorDetails = await response.json();
@@ -567,7 +650,7 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
         onNewMessage(assistantMessage);
       }
 
-      setApiStatus({ connected: true });
+      setApiStatus(prev => ({ ...prev, connected: true }));
 
     } catch (error) {
       console.error('Error calling API:', error);
@@ -575,7 +658,9 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
       let errorText = 'Sorry, I\'m having trouble connecting to the GitHub Code Assistant API.';
       
       if (error instanceof Error) {
-        if (error.message.includes('Validation Error')) {
+        if (error.message.includes('Authentication required')) {
+          errorText = 'Authentication required. Please sign in to continue.';
+        } else if (error.message.includes('Validation Error')) {
           errorText = `Request format error: ${error.message}. Please check your input and try again.`;
         } else if (error.message.includes('422')) {
           errorText = 'Request validation failed. Please check your message format and try again.';
@@ -592,7 +677,7 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
       };
 
       setMessages(prev => [...prev, errorMessage]);
-      setApiStatus({ connected: false });
+      setApiStatus(prev => ({ ...prev, connected: false }));
     } finally {
       setIsLoading(false);
     }
@@ -657,25 +742,80 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
     setProjectContext('');
   };
 
+  const needsAuth = apiStatus.authRequired && !firebaseToken;
+  const userIsAuthenticated = user && isAuthorized && firebaseToken;
+
   return (
     <div className="flex h-full bg-white">
       {/* GitHub Sidebar */}
       {showGithubPanel && (
         <div className="w-80 border-r border-gray-200 bg-gray-50 flex flex-col">
+          {/* Auth Status */}
+          {apiStatus.authRequired && (
+            <div className="p-4 border-b border-gray-200">
+              {userIsAuthenticated ? (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded p-2">
+                  <div className="flex items-center">
+                    {firebaseUser?.photoURL && (
+                      <img 
+                        src={firebaseUser.photoURL} 
+                        alt="Profile" 
+                        className="w-6 h-6 rounded-full mr-2"
+                      />
+                    )}
+                    <div>
+                      <span className="text-xs text-green-700 font-medium">
+                        {firebaseUser?.displayName || firebaseUser?.email}
+                      </span>
+                      <div className="text-xs text-green-600">Authenticated</div>
+                    </div>
+                  </div>
+                  {onSignOut && (
+                    <button
+                      onClick={onSignOut}
+                      className="text-green-600 hover:text-green-800 transition-colors"
+                      title="Sign Out"
+                    >
+                      <LogOut size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-orange-50 border border-orange-200 rounded p-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-orange-700 font-medium">
+                      🔐 Authentication required
+                    </span>
+                    <button
+                      onClick={onAuthRequired}
+                      className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* GitHub Connection */}
           <div className="p-4 border-b border-gray-200">
             {!githubConnected ? (
               <button
                 onClick={connectGitHub}
-                disabled={isConnecting}
-                className="w-full flex items-center justify-center p-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                disabled={isConnecting || needsAuth}
+                className={`w-full flex items-center justify-center p-3 rounded-lg transition-colors ${
+                  needsAuth
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                }`}
               >
                 {isConnecting ? (
                   <Loader2 size={20} className="mr-2 animate-spin" />
                 ) : (
                   <Github size={20} className="mr-2" />
                 )}
-                {isConnecting ? 'Connecting...' : 'Connect GitHub'}
+                {isConnecting ? 'Connecting...' : needsAuth ? 'Sign in first' : 'Connect GitHub'}
               </button>
             ) : (
               <div className="flex items-center space-x-3">
@@ -705,7 +845,7 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
             )}
           </div>
 
-          {githubConnected && (
+          {githubConnected && !needsAuth && (
             <>
               {/* Repository Selection */}
               <div className="p-4 border-b border-gray-200">
@@ -874,6 +1014,23 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
             </div>
             
             <div className="flex items-center space-x-2">
+              {/* Auth Status */}
+              {apiStatus.authRequired && (
+                <div className="flex items-center">
+                  {userIsAuthenticated ? (
+                    <div className="flex items-center text-green-600">
+                      <Lock size={16} className="mr-1" />
+                      <span className="text-xs">Authenticated</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-red-600">
+                      <Lock size={16} className="mr-1" />
+                      <span className="text-xs">Auth Required</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {apiStatus.connected ? (
                 <div className="flex items-center text-green-600">
                   <CheckCircle size={16} className="mr-1" />
@@ -910,6 +1067,32 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
             </div>
           </div>
 
+          {/* Auth Required Warning */}
+          {needsAuth && (
+            <div className="mb-4 bg-orange-50 border border-orange-200 rounded p-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-orange-700 font-medium">
+                  🔐 Authentication required to use GitHub Code Assistant
+                </span>
+                <button
+                  onClick={onAuthRequired}
+                  className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+                >
+                  Sign In
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Auth Error */}
+          {firebaseToken && user && !isAuthorized && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded p-2">
+              <span className="text-xs text-red-700">
+                Access Denied: Your account is not authorized for this application
+              </span>
+            </div>
+          )}
+
           {/* Mode Selector */}
           <div className="grid grid-cols-3 md:grid-cols-7 gap-2 mb-4">
             {modes.map((mode) => {
@@ -921,8 +1104,11 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
                 <button
                   key={mode.id}
                   onClick={() => setSelectedMode(mode.id)}
+                  disabled={needsAuth}
                   className={`p-3 rounded-lg border-2 transition-all text-center ${
-                    isSelected
+                    needsAuth
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : isSelected
                       ? `${colors.border} ${colors.bg} ${colors.text}`
                       : 'border-gray-200 hover:border-gray-300 text-gray-600'
                   }`}
@@ -942,7 +1128,12 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
               placeholder="Project context (e.g., 'React TypeScript app with Tailwind')"
               value={projectContext}
               onChange={(e) => setProjectContext(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={needsAuth}
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                needsAuth
+                  ? 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
             />
           </div>
 
@@ -992,7 +1183,7 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
         </div>
 
         {/* Quick Actions */}
-        {showQuickActions && (
+        {showQuickActions && !needsAuth && (
           <div className="border-b border-gray-200 p-4 bg-blue-50">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-sm font-medium text-gray-700">Quick Actions</h3>
@@ -1106,7 +1297,7 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
                             >
                               <Download size={14} />
                             </button>
-                            {selectedRepo && (
+                            {selectedRepo && !needsAuth && (
                               <button
                                 onClick={() => {
                                   const filename = prompt('Enter filename for this code:');
@@ -1155,10 +1346,18 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={`${getCurrentMode().description}... (Shift+Enter for new line)`}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[60px] max-h-32"
+                placeholder={
+                  needsAuth
+                    ? "Please sign in to start coding..."
+                    : `${getCurrentMode().description}... (Shift+Enter for new line)`
+                }
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 resize-none min-h-[60px] max-h-32 ${
+                  needsAuth
+                    ? 'border-orange-300 focus:ring-orange-500 bg-orange-50'
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
                 rows={2}
-                disabled={isLoading}
+                disabled={isLoading || needsAuth}
               />
             </div>
             
@@ -1173,16 +1372,25 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-3 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-lg transition-colors"
-                title="Upload files for context"
+                disabled={needsAuth}
+                className={`p-3 rounded-lg transition-colors ${
+                  needsAuth
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
+                }`}
+                title={needsAuth ? "Sign in to upload files" : "Upload files for context"}
               >
                 <Upload size={16} />
               </button>
               <button
                 onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputText.trim()}
-                className="p-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-                title="Send message"
+                disabled={isLoading || !inputText.trim() || needsAuth}
+                className={`p-3 rounded-lg transition-colors ${
+                  needsAuth || !inputText.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                } text-white`}
+                title={needsAuth ? "Sign in to send messages" : "Send message"}
               >
                 {isLoading ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -1195,12 +1403,18 @@ const GitHubCodeAssistant: React.FC<CodeAssistantProps> = ({
           
           <div className="flex justify-between items-center text-xs text-gray-500">
             <span>
-              Mode: {getCurrentMode().label}
-              {selectedRepo && ` • Repo: ${selectedRepo.name}`}
-              {selectedFiles.length > 0 && ` • ${selectedFiles.length} files selected`}
-              • Press Enter to send
+              {needsAuth ? (
+                'Authentication required - Please sign in to continue'
+              ) : (
+                <>
+                  Mode: {getCurrentMode().label}
+                  {selectedRepo && ` • Repo: ${selectedRepo.name}`}
+                  {selectedFiles.length > 0 && ` • ${selectedFiles.length} files selected`}
+                  • Press Enter to send
+                </>
+              )}
             </span>
-            {!showQuickActions && (
+            {!showQuickActions && !needsAuth && (
               <button 
                 onClick={() => setShowQuickActions(true)}
                 className="text-blue-600 hover:text-blue-800"

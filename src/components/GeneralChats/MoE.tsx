@@ -1,4 +1,4 @@
-// src/components/ChatInterface.tsx
+// src/components/MOEChatInterface.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, AlertCircle, CheckCircle, Cloud, X, Paperclip, FileText, Trash2, Lock, LogOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -17,7 +17,7 @@ interface UploadedFile {
   isPDF: boolean;
 }
 
-interface ChatInterfaceProps {
+interface MOEChatInterfaceProps {
   onNewMessage?: (message: Message) => void;
   apiEndpoint?: string;
   placeholder?: string;
@@ -38,11 +38,10 @@ interface ApiStatus {
   authRequired?: boolean;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({
+const MOEChatInterface: React.FC<MOEChatInterfaceProps> = ({
   onNewMessage,
-  apiEndpoint = 'https://lma-chat-api-443545551926.us-central1.run.app/basic/chat',
   placeholder = 'Type your message... (Press Enter to send, Shift+Enter for new line)',
-  welcomeMessage = 'Hello! I\'m your AI assistant powered by Gemini AI running on Google Cloud Run. How can I help you today?',
+  welcomeMessage = 'Hello! I\'m your Mix of Experts Model by Mistral from Huggingface. How can I help you today?',
   isLoading: externalLoading = false,
   selectedPrompt = '',
   onPromptSent,
@@ -73,11 +72,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const actualIsLoading = externalLoading || isLoading;
 
   const baseUrl = 'https://lma-chat-api-443545551926.us-central1.run.app';
-  const statusEndpoint = `${baseUrl}/health`; // Use health endpoint (unprotected)
-  const authStatusEndpoint = `${baseUrl}/auth/status`; // Use auth status endpoint (unprotected)
-  const authVerifyEndpoint = `${baseUrl}/auth/verify`; // Verify token endpoint (protected)
-  const chatEndpoint = apiEndpoint;
-  const filesChatEndpoint = `${baseUrl}/basic/chat/with-files`;
+  const statusEndpoint = `${baseUrl}/health`;
+  const authStatusEndpoint = `${baseUrl}/auth/status`;
+  const authVerifyEndpoint = `${baseUrl}/auth/verify`;
+  const chatEndpoint = `${baseUrl}/moe_chat/chat`;
+  const filesChatEndpoint = `${baseUrl}/moe_chat/chat/with-files`;
 
   // Update input text when selectedPrompt changes
   useEffect(() => {
@@ -473,10 +472,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">Basic Chat Assistant</h2>
+            <h2 className="text-lg font-semibold text-gray-800">Mix of Experts Chat Assistant</h2>
             <p className="text-sm text-gray-500 flex items-center">
               <Cloud size={14} className="mr-1" />
-              Powered by Gemini AI on Cloud Run
+              Powered by Mistral Mix of Experts AI on Cloud Run
             </p>
           </div>
 
@@ -556,7 +555,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {/* Model Display */}
         <div className="mt-2 text-xs text-gray-500">
-          Mode: BASIC CHAT | Model: Gemini Pro 2.0
+          Mode: Mix of Experts | Model: Mistral Mix of Experts
           {apiStatus.authRequired && (
             <span className="ml-2 text-orange-600">🔐 Auth Required</span>
           )}
@@ -791,4 +790,4 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   );
 };
 
-export default ChatInterface;
+export default MOEChatInterface;

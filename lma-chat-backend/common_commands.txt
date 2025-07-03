@@ -10,7 +10,3 @@ gcloud run deploy lma-chat-api \
   --memory 1Gi \
   --cpu 1 \
   --max-instances 1
-
-
-
-

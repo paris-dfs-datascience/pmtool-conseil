@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import ChatInterface from '../components/GeneralChats/ChatInterface';
 import PromptLibrary from '../components/GeneralChats/PromptLibrary';
+import { AuthContext } from '../types/auth';
 
 interface Message {
   id: string;
@@ -10,7 +11,11 @@ interface Message {
   timestamp: Date;
 }
 
-const ChatPage: React.FC = () => {
+interface ChatPageProps {
+  authContext?: AuthContext;
+}
+
+const ChatPage: React.FC<ChatPageProps> = ({ authContext }) => {
   const [messageCount, setMessageCount] = useState(1); // Start with 1 for the initial assistant message
   const [selectedPrompt, setSelectedPrompt] = useState<string>('');
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
@@ -42,6 +47,12 @@ const ChatPage: React.FC = () => {
           onNewMessage={handleNewMessage}
           selectedPrompt={selectedPrompt}
           onPromptSent={clearSelectedPrompt}
+          
+          // Pass Firebase auth props to ChatInterface
+          firebaseToken={authContext?.firebaseToken}
+          firebaseUser={authContext?.firebaseUser}
+          onAuthRequired={authContext?.onAuthRequired}
+          onSignOut={authContext?.onSignOut}
         />
       </div>
       

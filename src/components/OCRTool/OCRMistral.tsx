@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, X, Eye, Download } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Upload, FileText, AlertCircle, CheckCircle, X, Eye, Download, Lock, LogOut, RefreshCw } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth'; // Use the main app's useAuth hook
 
 interface OCRResult {
   id: string;
@@ -17,12 +18,84 @@ interface UploadedFile {
   preview?: string;
 }
 
-const MistralOCRFrontend: React.FC = () => {
+export interface AuthContext {
+  firebaseToken: string | null;
+  firebaseUser: any;
+  onSignOut: () => void;
+  onAuthRequired: () => void;
+}
+
+interface OCRToolPageProps {
+  authContext?: AuthContext;
+}
+
+const OCRToolPage: React.FC<OCRToolPageProps> = ({ authContext }) => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [results, setResults] = useState<OCRResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const API_ENDPOINT = 'https://ocr-tool-443545551926.us-central1.run.app/api/ocr';
   const [selectedResult, setSelectedResult] = useState<OCRResult | null>(null);
+  const [apiStatus, setApiStatus] = useState({ 
+    connected: false, 
+    authRequired: false,
+    error: undefined as string | undefined 
+  });
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  
+  const API_BASE = 'https://ocr-tool-443545551926.us-central1.run.app';
+  const API_ENDPOINT = `${API_BASE}/api/ocr`;
+
+  // Use the main app's useAuth hook
+  const { user, loading: authLoading, isAuthorized } = useAuth();
+
+  // Destructure authContext with fallbacks
+  const firebaseToken = authContext?.firebaseToken || null;
+  const firebaseUser = authContext?.firebaseUser || null;
+  const onSignOut = authContext?.onSignOut || (() => {});
+  const onAuthRequired = authContext?.onAuthRequired || (() => {});
+
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const headers: Record<string, string> = {};
+    
+    if (firebaseToken) {
+      headers['Authorization'] = `Bearer ${firebaseToken}`;
+    }
+    
+    return headers;
+  };
+
+  // Check API status on component mount
+  useEffect(() => {
+    checkApiStatus();
+  }, []);
+
+  const checkApiStatus = async () => {
+    setIsCheckingStatus(true);
+    try {
+      // Check health endpoint
+      const healthResponse = await fetch(`${API_BASE}/health`);
+      const healthData = await healthResponse.json();
+      
+      // Check auth status
+      const authResponse = await fetch(`${API_BASE}/auth/status`);
+      const authData = await authResponse.json();
+      
+      setApiStatus({
+        connected: healthResponse.ok && healthData.status === 'healthy',
+        authRequired: authData.authentication_enabled || false,
+        error: undefined
+      });
+    } catch (error) {
+      console.error('Error checking API status:', error);
+      setApiStatus({
+        connected: false,
+        authRequired: false,
+        error: 'Cannot connect to OCR service'
+      });
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
@@ -72,6 +145,12 @@ const MistralOCRFrontend: React.FC = () => {
   const processFiles = async () => {
     if (files.length === 0) return;
 
+    // Check authentication for protected endpoints
+    if (!firebaseToken && apiStatus.authRequired) {
+      onAuthRequired();
+      return;
+    }
+
     setIsProcessing(true);
     
     for (const uploadedFile of files) {
@@ -90,8 +169,14 @@ const MistralOCRFrontend: React.FC = () => {
       try {
         const response = await fetch(API_ENDPOINT, {
           method: 'POST',
+          headers: getAuthHeaders(),
           body: formData,
         });
+
+        if (response.status === 401) {
+          onAuthRequired();
+          throw new Error('Authentication required');
+        }
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -106,7 +191,7 @@ const MistralOCRFrontend: React.FC = () => {
           status: 'completed',
           text: result.text || result.extracted_text || '',
           confidence: result.confidence,
-          processedAt: new Date().toISOString()
+          processedAt: result.processed_at || new Date().toISOString()
         };
 
         console.log('Completed Result:', completedResult); // Debug log
@@ -159,26 +244,149 @@ const MistralOCRFrontend: React.FC = () => {
     }
   };
 
+  const needsAuth = apiStatus.authRequired && !firebaseToken;
+  const userIsAuthenticated = user && isAuthorized && firebaseToken;
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Mistral OCR Document Processor</h1>
-          <p className="text-gray-600 mb-6">Upload images or PDF documents to extract text using Mistral's OCR capabilities</p>
-          
+          {/* Header with Auth Status */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Mistral OCR Document Processor</h1>
+              <p className="text-gray-600">Upload images or PDF documents to extract text using Mistral's OCR capabilities</p>
+            </div>
+            
+            {/* Status Indicators */}
+            <div className="flex items-center space-x-4">
+              {/* Auth Status */}
+              {apiStatus.authRequired && (
+                <div className="flex items-center">
+                  {userIsAuthenticated ? (
+                    <div className="flex items-center text-green-600">
+                      <Lock size={16} className="mr-1" />
+                      <span className="text-xs">Authenticated</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-red-600">
+                      <Lock size={16} className="mr-1" />
+                      <span className="text-xs">Auth Required</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
+              {/* API Status */}
+              {apiStatus.connected ? (
+                <div className="flex items-center text-green-600">
+                  <CheckCircle size={16} className="mr-1" />
+                  <span className="text-xs">Connected</span>
+                </div>
+              ) : (
+                <div className="flex items-center text-red-600">
+                  <AlertCircle size={16} className="mr-1" />
+                  <span className="text-xs">Disconnected</span>
+                </div>
+              )}
+              
+              <button
+                onClick={checkApiStatus}
+                disabled={isCheckingStatus}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              >
+                {isCheckingStatus ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  'Test'
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* User Info */}
+          {firebaseUser && (
+            <div className="mb-4 flex items-center justify-between bg-blue-50 border border-blue-200 rounded p-2">
+              <div className="flex items-center">
+                {firebaseUser.photoURL && (
+                  <img 
+                    src={firebaseUser.photoURL} 
+                    alt="Profile" 
+                    className="w-6 h-6 rounded-full mr-2"
+                  />
+                )}
+                <div>
+                  <span className="text-xs text-blue-700 font-medium">
+                    {firebaseUser.displayName || firebaseUser.email}
+                  </span>
+                  {firebaseUser.email && firebaseUser.displayName && (
+                    <div className="text-xs text-blue-600">{firebaseUser.email}</div>
+                  )}
+                </div>
+              </div>
+              {onSignOut && (
+                <button
+                  onClick={onSignOut}
+                  className="text-blue-600 hover:text-blue-800 transition-colors"
+                  title="Sign Out"
+                >
+                  <LogOut size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Auth Required Warning */}
+          {needsAuth && (
+            <div className="mb-4 bg-orange-50 border border-orange-200 rounded p-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-orange-700 font-medium">
+                  🔐 Authentication required to use OCR service
+                </span>
+                <button
+                  onClick={onAuthRequired}
+                  className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+                >
+                  Sign In
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Auth Error */}
+          {firebaseToken && user && !isAuthorized && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded p-2">
+              <span className="text-xs text-red-700">
+                Access Denied: Your account is not authorized for this application
+              </span>
+            </div>
+          )}
+
+          {/* Connection Error */}
+          {!apiStatus.connected && apiStatus.error && (
+            <div className="mb-4 text-xs text-red-600 bg-red-50 p-2 rounded">
+              Error: {apiStatus.error}
+              <div className="mt-1 text-gray-600">
+                Make sure the OCR service is running and accessible.
+              </div>
+            </div>
+          )}
 
           {/* File Upload Area */}
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors duration-200"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors duration-200 ${
+              needsAuth 
+                ? 'border-orange-300 bg-orange-50'
+                : 'border-gray-300 hover:border-blue-400'
+            }`}
+            onDrop={needsAuth ? undefined : handleDrop}
+            onDragOver={needsAuth ? undefined : handleDragOver}
           >
-            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-lg font-medium text-gray-700 mb-2">
-              Drop files here or click to upload
+            <Upload className={`mx-auto h-12 w-12 mb-4 ${needsAuth ? 'text-orange-400' : 'text-gray-400'}`} />
+            <p className={`text-lg font-medium mb-2 ${needsAuth ? 'text-orange-700' : 'text-gray-700'}`}>
+              {needsAuth ? 'Please sign in to upload files' : 'Drop files here or click to upload'}
             </p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className={`text-sm mb-4 ${needsAuth ? 'text-orange-600' : 'text-gray-500'}`}>
               Supports images (PNG, JPG, JPEG) and PDF files
             </p>
             <input
@@ -188,12 +396,17 @@ const MistralOCRFrontend: React.FC = () => {
               onChange={handleFileUpload}
               className="hidden"
               id="file-upload"
+              disabled={needsAuth}
             />
             <label
               htmlFor="file-upload"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer transition-colors duration-200"
+              className={`inline-flex items-center px-4 py-2 rounded-md transition-colors duration-200 ${
+                needsAuth
+                  ? 'bg-orange-400 text-orange-700 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+              }`}
             >
-              Select Files
+              {needsAuth ? 'Sign In Required' : 'Select Files'}
             </label>
           </div>
 
@@ -207,10 +420,14 @@ const MistralOCRFrontend: React.FC = () => {
                 <div className="space-x-2">
                   <button
                     onClick={processFiles}
-                    disabled={isProcessing}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                    disabled={isProcessing || needsAuth}
+                    className={`px-4 py-2 rounded-md transition-colors duration-200 ${
+                      needsAuth || isProcessing
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
                   >
-                    {isProcessing ? 'Processing...' : 'Process All'}
+                    {isProcessing ? 'Processing...' : needsAuth ? 'Sign In Required' : 'Process All'}
                   </button>
                   <button
                     onClick={clearAll}
@@ -358,4 +575,4 @@ const MistralOCRFrontend: React.FC = () => {
   );
 };
 
-export default MistralOCRFrontend;
+export default OCRToolPage;

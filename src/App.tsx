@@ -1,22 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogIn } from 'lucide-react';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 import GitHubCodeAssistantPage from './pages/GitHubCodeAssistantPage';
 import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
-import ConsultingChat from './components/ConsultingFrameworks/ConsultingChat';
+import ConsultingPage from './pages/ConsultingPage';
 import LMAPage from './pages/LMAPage';
-import GraphitePage from './pages/GraphitePage';
-import CatalantPage from './pages/CatalantPage';
-import DocumentAI from './pages/DocumentAI';
 import OCRToolPage from './pages/OCRPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
-import ClaudeInterface from './components/GeneralChats/ClaudeChat';
+import ClaudePage from './pages/ClaudePage';
+import MOEChatPage from './pages/MOEChatPage';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
+import { AuthContext } from './types/auth';
 import './index.css'; // Import the Tailwind CSS file
-import { format } from 'path';
 
 interface User {
   displayName?: string | null;
@@ -27,6 +25,51 @@ interface User {
 function App() {
   const [activeTab, setActiveTab] = useState('home');
   const { user, loading, isAuthorized } = useAuth();
+  const [firebaseToken, setFirebaseToken] = useState<string | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
+
+  // Get Firebase ID token when user changes
+  useEffect(() => {
+    const getToken = async () => {
+      if (user && isAuthorized) {
+        setTokenLoading(true);
+        try {
+          // Get the Firebase ID token (this is what your backend needs)
+          const token = await (user as any).getIdToken();
+          setFirebaseToken(token);
+          console.log('Firebase ID token obtained');
+        } catch (error) {
+          console.error('Error getting Firebase ID token:', error);
+          setFirebaseToken(null);
+        } finally {
+          setTokenLoading(false);
+        }
+      } else {
+        setFirebaseToken(null);
+      }
+    };
+
+    getToken();
+  }, [user, isAuthorized]);
+
+  // Refresh token periodically (Firebase tokens expire after 1 hour)
+  useEffect(() => {
+    if (user && isAuthorized && firebaseToken) {
+      const refreshToken = async () => {
+        try {
+          const token = await (user as any).getIdToken(true); // Force refresh
+          setFirebaseToken(token);
+          console.log('Firebase token refreshed');
+        } catch (error) {
+          console.error('Error refreshing Firebase token:', error);
+        }
+      };
+
+      // Refresh token every 50 minutes (before 1-hour expiry)
+      const interval = setInterval(refreshToken, 50 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [user, isAuthorized, firebaseToken]);
 
   const signInWithGoogle = async () => {
     try {
@@ -36,7 +79,32 @@ function App() {
     }
   };
 
-  if (loading) {
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      setFirebaseToken(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const handleAuthRequired = () => {
+    // This gets called if a chat component detects auth is needed
+    console.log('Authentication required');
+    if (!user) {
+      signInWithGoogle();
+    }
+  };
+
+  // Create auth context object to pass to chat components
+  const authContext: AuthContext = {
+    firebaseToken,
+    firebaseUser: user,
+    onSignOut: handleSignOut,
+    onAuthRequired: handleAuthRequired
+  };
+
+  if (loading || tokenLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -44,15 +112,17 @@ function App() {
     );
   }
 
-  const renderPreviewPage = (title: string, description: string) => {
+
+
+  const renderLMAPreviewPage = () => {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-md">
           <h1 className="text-3xl font-bold text-gray-800 mb-4">
-            {title}
+            🎡 LMA Knowledge Assistant
           </h1>
           <p className="text-gray-600 mb-6">
-            {description}
+            AI-powered knowledge base with RAG technology for instant access to LMA policies, procedures, and consulting resources.
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-blue-800 mb-2">
@@ -76,80 +146,29 @@ function App() {
   };
 
   const renderContent = () => {
-    if (activeTab === 'home') {
-      return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
-    }
-
-    if (!user) {
-      switch (activeTab) {
-        case 'chat':
-          return renderPreviewPage(
-            '💬 AI Chat Assistant',
-            'Intelligent conversational AI powered by Google Gemini for LMA consulting workflows.'
-          );
-          case 'claude':
-          return renderPreviewPage(
-            'Claude Chat',
-            'Intelligent conversational AI powered by Athropic Claude for LMA consulting workflows.'
-          );
-        case 'lma':
-          return renderPreviewPage(
-            '🎡 LMA Knowledge Assistant',
-            'AI-powered knowledge base with RAG technology for instant access to LMA policies, procedures, and consulting resources.'
-          );
-        case 'graphite':
-          return renderPreviewPage(
-            '✏️ Graphite Integration',
-            'Streamlined project management and collaboration tools for consulting projects.'
-          );
-        case 'catalant':
-          return renderPreviewPage(
-            '💼 Catalant Workspace',
-            'Professional consulting platform integration for enhanced productivity.'
-          );
-        case 'code':
-          return renderPreviewPage(
-            '⚡ Code Assistant',
-            'AI-powered coding companion for technical consulting and development projects.'
-          );
-        case 'ocr':
-          return renderPreviewPage(
-              '⚡ OCR Tool AI',
-              'OCR Tool for Document Analysis'
-            );
-        case 'documentai':
-          return renderPreviewPage(
-              '⚡ Document AI',
-              'AI for common documents'
-            );
-        default:
-          return renderPreviewPage('🔒 Protected Area', 'This section requires authentication.');
-      }
-    }
-
-    if (!isAuthorized) {
-      return <UnauthorizedPage userEmail={user.email || undefined} />;
-    }
-
+    // Always allow access to pages for demo purposes except LMA
+    // Authentication is handled at the API level
     switch (activeTab) {
-      case 'chat':
-        return <ChatPage />;
-      case 'claude':
-        return <ClaudeInterface />;
-      case 'framework':
-        return <ConsultingChat />;
+      case 'home':
+        return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
       case 'lma':
-        return <LMAPage />;
-      case 'graphite':
-        return <GraphitePage />;
-      case 'catalant':
-        return <CatalantPage />;
+        // LMA requires authentication - show preview if not authenticated
+        if (!user || !isAuthorized) {
+          return renderLMAPreviewPage();
+        }
+        return <LMAPage authContext={authContext} />;
+      case 'chat':
+        return <ChatPage authContext={authContext} />;
+      case 'claude':
+        return <ClaudePage authContext={authContext} />;
+      case 'moechat':
+        return <MOEChatPage authContext={authContext} />;
+      case 'framework':
+        return <ConsultingPage authContext={authContext} />;
       case 'code':
-        return <GitHubCodeAssistantPage />;
+        return <GitHubCodeAssistantPage authContext={authContext} />;
       case 'ocr':
-          return <OCRToolPage />;
-      case 'documentai':
-          return <DocumentAI />;
+        return <OCRToolPage authContext={authContext} />;
       default:
         return (
           <div className="flex items-center justify-center h-full">
@@ -178,9 +197,17 @@ function App() {
         </div>
         <div className="flex items-center space-x-4">
           {user && (
-            <span className="text-sm text-gray-600">
-              Welcome, {user.displayName || 'User'}
-            </span>
+            <>
+              <span className="text-sm text-gray-600">
+                Welcome, {user.displayName || 'User'}
+              </span>
+              {/* Show token status for debugging */}
+              {firebaseToken && (
+                <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  🔐 Authenticated
+                </span>
+              )}
+            </>
           )}
         </div>
       </header>

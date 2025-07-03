@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, AlertCircle, CheckCircle, Database, Search, Bot, User } from 'lucide-react';
+import { Send, Loader2, AlertCircle, CheckCircle, Database, Search, Bot, User, Lock, LogOut, X } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth'; // Use the main app's useAuth hook
 
 interface Message {
   id: string;
@@ -8,16 +9,25 @@ interface Message {
   timestamp: Date;
 }
 
+export interface AuthContext {
+  firebaseToken: string | null;
+  firebaseUser: any;
+  onSignOut: () => void;
+  onAuthRequired: () => void;
+}
+
 interface RAGChatInterfaceProps {
   onNewMessage?: (message: Message) => void;
   placeholder?: string;
   welcomeMessage?: string;
   isLoading?: boolean;
+  authContext: AuthContext;
 }
 
 interface ApiStatus {
   connected: boolean;
   error?: string;
+  authRequired?: boolean;
 }
 
 // Helper function to format text with proper spacing and structure
@@ -104,7 +114,8 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
   onNewMessage,
   placeholder = 'Ask me anything about LMA... (Press Enter to send, Shift+Enter for new line)',
   welcomeMessage = 'Hello! I\'m your LMA Knowledge Assistant powered by RAG technology. I can help you find information from our knowledge base. What would you like to know?',
-  isLoading: externalLoading = false
+  isLoading: externalLoading = false,
+  authContext
 }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -121,18 +132,26 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
   const [temperature, setTemperature] = useState(0.7);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Use the main app's useAuth hook
+  const { user, loading: authLoading, isAuthorized } = useAuth();
+
+  // Destructure authContext
+  const { firebaseToken, firebaseUser, onSignOut, onAuthRequired } = authContext;
+
   // Use external loading state if provided, otherwise use internal state
   const actualIsLoading = externalLoading || isLoading;
 
   // RAG API endpoints
   const baseUrl = 'https://lma-chat-api-443545551926.us-central1.run.app';
-  const statusEndpoint = `${baseUrl}/rag/status`;
-  const chatEndpoint = `${baseUrl}/rag/chat`;
-  const searchEndpoint = `${baseUrl}/rag/search`;
+  const statusEndpoint = `${baseUrl}/health`;
+  const authStatusEndpoint = `${baseUrl}/auth/status`;
+  const chatEndpoint = `${baseUrl}/rag_chat/chat`; // Fixed: use rag_chat prefix
+  const searchEndpoint = `${baseUrl}/rag_chat/search`; // Fixed: use rag_chat prefix
 
   // Check API status on component mount
   useEffect(() => {
     checkApiStatus();
+    checkAuthStatus();
   }, []);
 
   // Auto-scroll to bottom when new messages arrive
@@ -151,6 +170,18 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       }]);
     }
   }, [welcomeMessage]);
+
+  const getAuthHeaders = () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (firebaseToken) {
+      headers['Authorization'] = `Bearer ${firebaseToken}`;
+    }
+    
+    return headers;
+  };
 
   const checkApiStatus = async () => {
     try {
@@ -179,28 +210,55 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
     }
   };
 
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch(authStatusEndpoint);
+      if (response.ok) {
+        const data = await response.json();
+        setApiStatus(prev => ({
+          ...prev,
+          authRequired: data.authentication_enabled
+        }));
+      }
+    } catch (error) {
+      console.error('Auth status check failed:', error);
+    }
+  };
+
   // Helper function to clean and format the response from the backend
   const cleanAndFormatResponse = (response: string): string => {
     // Remove excessive whitespace
     let cleaned = response.trim();
     
+    // Fix bullet point formatting - convert * to proper bullets
+    cleaned = cleaned.replace(/^\* /gm, '• ');
+    cleaned = cleaned.replace(/\n\* /g, '\n• ');
+    
+    // Fix nested bullet points (convert * * to proper indentation)
+    cleaned = cleaned.replace(/\n• \* /g, '\n  • ');
+    cleaned = cleaned.replace(/^\* \* /gm, '  • ');
+    
+    // Add proper spacing around section headers (lines that end with colons)
+    cleaned = cleaned.replace(/^([A-Za-z][^:\n]*:)$/gm, '\n## $1\n');
+    
+    // Format headings better (standalone words followed by newlines and bullets)
+    cleaned = cleaned.replace(/^([A-Z][A-Za-z\s]+)\n(• )/gm, '\n## $1\n\n$2');
+    
+    // Add double newlines before major sections
+    cleaned = cleaned.replace(/(However,|Additionally,|Furthermore,|In conclusion,|For example,|Note:|Important:)/gi, '\n\n$1');
+    
     // Ensure proper spacing between sentences
     cleaned = cleaned.replace(/\.(?=[A-Z])/g, '. ');
     
-    // Add double newlines before common section headers
-    cleaned = cleaned.replace(/(However,|Additionally,|Furthermore,|In conclusion,|For example,|Note:|Important:)/gi, '\n\n$1');
+    // Clean up excessive newlines but preserve intentional breaks
+    cleaned = cleaned.replace(/\n{4,}/g, '\n\n\n');
+    cleaned = cleaned.replace(/\n{2}(• )/g, '\n$1');
     
-    // Format numbered lists
-    cleaned = cleaned.replace(/(\d+)\.\s*/g, '\n$1. ');
-    
-    // Format bullet points
-    cleaned = cleaned.replace(/([•·▪▫◦‣⁃])\s*/g, '\n- ');
-    
-    // Remove multiple consecutive newlines (more than 2)
-    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-    
-    // Ensure the response doesn't start with newlines
+    // Remove leading newlines
     cleaned = cleaned.replace(/^\n+/, '');
+    
+    // Add spacing between major sections
+    cleaned = cleaned.replace(/\n## /g, '\n\n## ');
     
     return cleaned;
   };
@@ -217,15 +275,19 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       
       const response = await fetch(chatEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           messages: conversationHistory,
           temperature: temperature,
           max_tokens: 4096
         }),
       });
+
+      if (response.status === 401) {
+        // Authentication failed
+        onAuthRequired();
+        throw new Error('Authentication required');
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -249,14 +311,18 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       
       const response = await fetch(searchEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           query: query,
           top_k: 10
         }),
       });
+
+      if (response.status === 401) {
+        // Authentication failed
+        onAuthRequired();
+        throw new Error('Authentication required');
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -276,6 +342,12 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || actualIsLoading) return;
+
+    // Check authentication for protected endpoints
+    if (!firebaseToken && apiStatus.authRequired) {
+      onAuthRequired();
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -319,14 +391,16 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       }
 
       // Update API status to connected on successful response
-      setApiStatus({ connected: true });
+      setApiStatus(prev => ({ ...prev, connected: true }));
 
     } catch (error) {
       console.error('❌ Error in RAG operation:', error);
       
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I\'m having trouble accessing the knowledge base. The service might be starting up. Please try again.',
+        text: error instanceof Error && error.message === 'Authentication required' 
+          ? 'Authentication required. Please sign in to continue.'
+          : 'Sorry, I\'m having trouble accessing the knowledge base. The service might be starting up. Please try again.',
         sender: 'assistant',
         timestamp: new Date()
       };
@@ -338,10 +412,11 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       }
 
       // Update API status
-      setApiStatus({ 
+      setApiStatus(prev => ({ 
+        ...prev,
         connected: false, 
         error: error instanceof Error ? error.message : 'RAG connection failed' 
-      });
+      }));
 
     } finally {
       setIsLoading(false);
@@ -358,6 +433,7 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
   const testConnection = async () => {
     setIsLoading(true);
     await checkApiStatus();
+    await checkAuthStatus();
     setIsLoading(false);
   };
 
@@ -371,6 +447,9 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
       }
     ]);
   };
+
+  const needsAuth = apiStatus.authRequired && !firebaseToken;
+  const userIsAuthenticated = user && isAuthorized && firebaseToken;
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -388,8 +467,26 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
             </p>
           </div>
           
-          {/* API Status Indicator */}
+          {/* Status Indicators */}
           <div className="flex items-center space-x-2">
+            {/* Auth Status */}
+            {apiStatus.authRequired && (
+              <div className="flex items-center">
+                {userIsAuthenticated ? (
+                  <div className="flex items-center text-green-600">
+                    <Lock size={16} className="mr-1" />
+                    <span className="text-xs">Authenticated</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-red-600">
+                    <Lock size={16} className="mr-1" />
+                    <span className="text-xs">Auth Required</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* API Status */}
             {apiStatus.connected ? (
               <div className="flex items-center text-green-600">
                 <CheckCircle size={16} className="mr-1" />
@@ -412,15 +509,50 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
           </div>
         </div>
 
+        {/* User Info */}
+        {firebaseUser && (
+          <div className="mt-2 flex items-center justify-between bg-blue-50 border border-blue-200 rounded p-2">
+            <div className="flex items-center">
+              {firebaseUser.photoURL && (
+                <img 
+                  src={firebaseUser.photoURL} 
+                  alt="Profile" 
+                  className="w-6 h-6 rounded-full mr-2"
+                />
+              )}
+              <div>
+                <span className="text-xs text-blue-700 font-medium">
+                  {firebaseUser.displayName || firebaseUser.email}
+                </span>
+                {firebaseUser.email && firebaseUser.displayName && (
+                  <div className="text-xs text-blue-600">{firebaseUser.email}</div>
+                )}
+              </div>
+            </div>
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="text-blue-600 hover:text-blue-800 transition-colors"
+                title="Sign Out"
+              >
+                <LogOut size={14} />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Mode and Controls */}
         <div className="mt-3 flex items-center justify-between">
           {/* Search Mode Toggle */}
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setSearchMode('chat')}
+              disabled={needsAuth}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center ${
                 searchMode === 'chat'
                   ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                  : needsAuth
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -429,9 +561,12 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
             </button>
             <button
               onClick={() => setSearchMode('search')}
+              disabled={needsAuth}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center ${
                 searchMode === 'search'
                   ? 'bg-green-100 text-green-700 border border-green-300'
+                  : needsAuth
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -450,13 +585,19 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
               step="0.1"
               value={temperature}
               onChange={(e) => setTemperature(parseFloat(e.target.value))}
+              disabled={needsAuth}
               className="w-16"
             />
             <span className="text-sm text-gray-600 w-8">{temperature}</span>
             
             <button
               onClick={clearChat}
-              className="text-xs px-2 py-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md"
+              disabled={needsAuth}
+              className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                needsAuth
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+              }`}
             >
               Clear
             </button>
@@ -475,7 +616,38 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
         {/* API URL Display */}
         <div className="mt-2 text-xs text-gray-500">
           API: LMA Knowledge Base with Gemini Pro 2.0
+          {apiStatus.authRequired && (
+            <span className="ml-2 text-orange-600">🔐 Auth Required</span>
+          )}
         </div>
+
+        {/* Auth Required Warning */}
+        {needsAuth && (
+          <div className="mt-2 bg-orange-50 border border-orange-200 rounded p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-orange-700 font-medium">
+                🔐 Authentication required to use this service
+              </span>
+              {onAuthRequired && (
+                <button
+                  onClick={onAuthRequired}
+                  className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Auth Error */}
+        {firebaseToken && user && !isAuthorized && (
+          <div className="mt-2 bg-red-50 border border-red-200 rounded p-2">
+            <span className="text-xs text-red-700">
+              Access Denied: Your account is not authorized for this application
+            </span>
+          </div>
+        )}
         
         {/* Error Message */}
         {!apiStatus.connected && apiStatus.error && (
@@ -549,15 +721,24 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={placeholder}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[44px] max-h-32"
+            placeholder={needsAuth ? "Please sign in to start chatting..." : placeholder}
+            className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 resize-none min-h-[44px] max-h-32 ${
+              needsAuth
+                ? 'border-orange-300 focus:ring-orange-500 bg-orange-50'
+                : 'border-gray-300 focus:ring-blue-500'
+            }`}
             rows={1}
-            disabled={actualIsLoading}
+            disabled={actualIsLoading || needsAuth}
           />
           <button
             onClick={handleSendMessage}
-            disabled={actualIsLoading || !inputText.trim()}
-            className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white p-2 rounded-lg transition-colors min-w-[44px] flex items-center justify-center"
+            disabled={actualIsLoading || !inputText.trim() || needsAuth}
+            className={`${
+              needsAuth 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-blue-500 hover:bg-blue-600'
+            } disabled:bg-gray-400 text-white p-2 rounded-lg transition-colors min-w-[44px] flex items-center justify-center`}
+            title={needsAuth ? "Sign in to send messages" : "Send message"}
           >
             {actualIsLoading ? (
               <Loader2 size={20} className="animate-spin" />
@@ -571,7 +752,9 @@ const RAGChatInterface: React.FC<RAGChatInterfaceProps> = ({
         
         {/* Connection status */}
         <div className="mt-2 text-xs text-gray-500">
-          {actualIsLoading ? 
+          {needsAuth ? (
+            'Authentication required - Please sign in to continue'
+          ) : actualIsLoading ? 
             (apiStatus.connected ? 
               (searchMode === 'chat' ? 'Processing with RAG...' : 'Searching knowledge base...') : 
               'Waking up RAG service...') : 
