@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState } from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, ScanSearch, Beaker} from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -38,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
     { id: 'moechat', icon: Beaker, label: 'MoE AI Chat' },
     { id: 'framework', icon: LayoutList, label: 'Framework Assistant' },
     { id: 'lma', icon: FerrisWheel, label: 'LMA Assistant' },
+    { id: 'automl', icon: ChartScatter, label: 'AutoML' },
     { id: 'code', icon: Code, label: 'Code Assistant' },
     { id: 'ocr', icon: ScanSearch, label: 'OCR-Mistral' },
   ];

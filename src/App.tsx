@@ -7,6 +7,7 @@ import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
 import ConsultingPage from './pages/ConsultingPage';
 import LMAPage from './pages/LMAPage';
+import AutoML from './pages/AutoMLpage';
 import OCRToolPage from './pages/OCRPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
 import ClaudePage from './pages/ClaudePage';
@@ -167,6 +168,8 @@ function App() {
         return <ConsultingPage authContext={authContext} />;
       case 'code':
         return <GitHubCodeAssistantPage authContext={authContext} />;
+      case 'automl':
+        return <AutoML />;
       case 'ocr':
         return <OCRToolPage authContext={authContext} />;
       default:
