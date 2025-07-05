@@ -2,3 +2,7 @@
 fastapi
 uvicorn
 google-cloud-storage
+pandas
+numpy
+scipy
+scikit-learn
