@@ -7,7 +7,7 @@ import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
 import ConsultingPage from './pages/ConsultingPage';
 import LMAPage from './pages/LMAPage';
-import AutoML from './pages/AutoMLpage';
+import AutoMLPage from './pages/AutoMLpage';
 import OCRToolPage from './pages/OCRPage';
 import UnauthorizedPage from './components/UnauthorizedPage';
 import ClaudePage from './pages/ClaudePage';
@@ -169,19 +169,19 @@ function App() {
       case 'code':
         return <GitHubCodeAssistantPage authContext={authContext} />;
       case 'automl':
-        return <AutoML />;
+        return <AutoMLPage />;
       case 'ocr':
         return <OCRToolPage authContext={authContext} />;
-      default:
-        return (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <h1 className="text-2xl text-gray-500">Select a page</h1>
+        default:
+          return (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <h1 className="text-2xl text-gray-500">Select a page</h1>
+              </div>
             </div>
-          </div>
-        );
-    }
-  };
+          );
+      }
+    };
 
   return (
     <div className="flex flex-col h-screen bg-white">

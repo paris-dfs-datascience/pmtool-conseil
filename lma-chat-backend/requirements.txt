@@ -1,34 +1,38 @@
 # FastAPI and core dependencies
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-python-multipart==0.0.6
-anthropic[vertex]
-python-json-logger==2.0.7
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+python-json-logger
 
+# Anthropic
+anthropic
 
 # HTTP client
-httpx==0.25.2
+httpx
 
-# Google Cloud (core dependencies)
-google-auth==2.25.2
-google-auth-oauthlib==1.1.0
-google-cloud-aiplatform==1.67.0
+# Google Cloud dependencies
+google-auth
+google-auth-oauthlib
+google-cloud-aiplatform
 firebase-admin
 
 # Vertex AI for your existing routers
-vertexai==1.67.0
-google-generativeai==0.7.2
+vertexai
+google-generativeai
 
 # Google GenAI (for unified client)
-google-genai>=0.8.0
+google-genai
 
 # Environment and configuration
-python-dotenv==1.0.0
+python-dotenv
 
 # GitHub Code Assistant dependencies
-google-cloud-secret-manager>=2.16.0
-aiofiles>=23.0.0
+google-cloud-secret-manager
+aiofiles
 
-#Huggingface
-huggingface_hub>=0.20.0
+# Huggingface
+huggingface_hub
+
+# Mistral AI dependencies
+mistralai

@@ -1,0 +1,12 @@
+# Build and push to Container Registry
+gcloud builds submit --tag gcr.io/lma-website-461920/automl
+
+# Deploy to Cloud Run
+gcloud run deploy automl \
+  --image gcr.io/lma-website-461920/automl \
+  --region us-central1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --memory 1Gi \
+  --cpu 1 \
+  --max-instances 1

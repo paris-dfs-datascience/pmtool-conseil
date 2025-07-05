@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v2.0, added AutoML framework with mock data"
+git commit -m "LMA v2.0, refactoring AutoML, filebrowser works for table-conseil-data"
 git push -u origin main

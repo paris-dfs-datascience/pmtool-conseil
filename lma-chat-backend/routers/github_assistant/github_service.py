@@ -21,32 +21,24 @@ class GitHubService:
     def __init__(
         self, 
         github_token: str,
-        project_id: str,
-        region: str = "us-central1",
-        model: str = "codestral-2501"
+        project_id: str,  # Keep for backward compatibility but ignore
+        region: str = "us-central1",  # Keep for backward compatibility but ignore
+        model: str = "codestral-latest"
     ):
         self.github_client = GitHubClient(github_token)
-        self.mistral_client = MistralClient(project_id, region, model)
+        # NEW: Only pass model to MistralClient
+        self.mistral_client = MistralClient(model=model)
+        
+        # Keep these for backward compatibility in status reporting
+        self.project_id = project_id
+        self.region = region
+        self.model = model
         
         logger.info("GitHub service initialized successfully")
     
     async def chat(self, request: GitHubChatRequest) -> GitHubChatResponse:
         """Handle chat request with GitHub context"""
         try:
-            # Prepare conversation history
-            messages = []
-            for msg in request.conversation_history:
-                messages.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
-            
-            # Add current message
-            messages.append({
-                "role": "user",
-                "content": request.message
-            })
-            
             # Get repository context if provided
             repo_context = None
             if request.repository_url:
@@ -59,13 +51,30 @@ class GitHubService:
                     logger.warning(f"Failed to get repo context: {e}")
                     # Continue without repo context
             
-            # Generate response
+            # Build conversation history from request
+            conversation_messages = []
+            for msg in request.conversation_history:
+                conversation_messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            
+            # Add conversation history to MistralClient if any
+            if conversation_messages:
+                self.mistral_client.clear_conversation()
+                for msg in conversation_messages:
+                    if msg["role"] == "user":
+                        self.mistral_client.add_user_message(msg["content"])
+                    elif msg["role"] == "assistant":
+                        self.mistral_client.add_assistant_message(msg["content"])
+            
+            # Generate response using the new method signature
             full_response = ""
             code_blocks = None
             github_action = None
             
             async for chunk in self.mistral_client.generate_response(
-                messages,
+                user_message=request.message,
                 stream=request.stream,
                 repo_context=repo_context,
                 temperature=request.temperature,
@@ -99,20 +108,6 @@ class GitHubService:
     async def stream_chat(self, request: GitHubChatRequest) -> AsyncGenerator[str, None]:
         """Stream chat response"""
         try:
-            # Prepare conversation history
-            messages = []
-            for msg in request.conversation_history:
-                messages.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
-            
-            # Add current message
-            messages.append({
-                "role": "user",
-                "content": request.message
-            })
-            
             # Get repository context if provided
             repo_context = None
             if request.repository_url:
@@ -124,9 +119,26 @@ class GitHubService:
                 except Exception as e:
                     logger.warning(f"Failed to get repo context: {e}")
             
-            # Stream response
+            # Build conversation history from request
+            conversation_messages = []
+            for msg in request.conversation_history:
+                conversation_messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            
+            # Add conversation history to MistralClient if any
+            if conversation_messages:
+                self.mistral_client.clear_conversation()
+                for msg in conversation_messages:
+                    if msg["role"] == "user":
+                        self.mistral_client.add_user_message(msg["content"])
+                    elif msg["role"] == "assistant":
+                        self.mistral_client.add_assistant_message(msg["content"])
+            
+            # Stream response using the new method signature
             async for chunk in self.mistral_client.generate_response(
-                messages,
+                user_message=request.message,
                 stream=True,
                 repo_context=repo_context,
                 temperature=request.temperature,
@@ -253,36 +265,36 @@ class GitHubService:
         try:
             status_info = GitHubServiceStatus(
                 status="operational",
-                model=self.mistral_client.model,
-                platform="Google Cloud Vertex AI Model Garden",
+                model=self.model,
+                platform="Mistral AI Direct API",
                 capabilities=[
                     "Code generation",
-                    "GitHub integration",
-                    "Code review", 
+                    "GitHub integration", 
+                    "Code review",
                     "File creation",
                     "Pull request management"
                 ],
                 configuration={
-                    "project_id": self.mistral_client.project_id,
-                    "region": self.mistral_client.region,
-                    "model": self.mistral_client.model,
+                    "project_id": self.project_id,
+                    "region": self.region,
+                    "model": self.model,
                     "github_integration": True,
-                    "model_garden_connected": False,
+                    "mistral_api_connected": False,
                     "github_api_accessible": False,
                     "test_results": {}
                 }
             )
             
-            # Test Model Garden connection
+            # Test Mistral API connection
             try:
                 model_connected = await self.mistral_client.test_connection()
-                status_info.configuration["model_garden_connected"] = model_connected
-                status_info.configuration["test_results"]["model_garden"] = (
+                status_info.configuration["mistral_api_connected"] = model_connected
+                status_info.configuration["test_results"]["mistral_api"] = (
                     "successful" if model_connected else "failed"
                 )
             except Exception as e:
-                logger.error(f"Model Garden test failed: {e}")
-                status_info.configuration["test_results"]["model_garden"] = f"failed - {str(e)}"
+                logger.error(f"Mistral API test failed: {e}")
+                status_info.configuration["test_results"]["mistral_api"] = f"failed - {str(e)}"
             
             # Test GitHub API connection
             try:
@@ -295,7 +307,7 @@ class GitHubService:
                 status_info.configuration["test_results"]["github_api"] = f"failed - {str(e)}"
             
             # Determine overall status
-            if (status_info.configuration["model_garden_connected"] and 
+            if (status_info.configuration["mistral_api_connected"] and 
                 status_info.configuration["github_api_accessible"]):
                 status_info.status = "operational"
             else:
@@ -307,14 +319,14 @@ class GitHubService:
             logger.error(f"Status check failed: {e}")
             return GitHubServiceStatus(
                 status="error",
-                model=self.mistral_client.model,
-                platform="Google Cloud Vertex AI Model Garden",
+                model=self.model,
+                platform="Mistral AI Direct API",
                 configuration={
                     "error": str(e),
-                    "model_garden_connected": False,
+                    "mistral_api_connected": False,
                     "github_integration": True,
-                    "project_id": self.mistral_client.project_id,
-                    "region": self.mistral_client.region,
-                    "model": self.mistral_client.model
+                    "project_id": self.project_id,
+                    "region": self.region,
+                    "model": self.model
                 }
             )

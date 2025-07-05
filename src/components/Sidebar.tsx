@@ -1,5 +1,5 @@
 // src/components/Sidebar.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
@@ -13,6 +13,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuthorized }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const signInWithGoogle = async () => {
     try {
@@ -29,6 +30,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  };
+
+  const handleMouseEnter = () => {
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    // Set a new timeout for 3 seconds
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(true);
+    }, 2000);
+  };
+
+  const handleMouseLeave = () => {
+    // Clear the timeout if mouse leaves before 1.5 seconds
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    // Immediately close the sidebar
+    setIsHovered(false);
   };
 
   const navItems = [
@@ -67,8 +91,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
       className={`bg-gray-50 border-r border-gray-200 flex flex-col py-4 transition-all duration-300 ease-in-out ${
         isHovered ? 'w-52' : 'w-16'
       }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="flex flex-col px-2">
         {/* Navigation Items */}

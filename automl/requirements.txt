@@ -1,0 +1,4 @@
+# filename: requirements.txt
+fastapi
+uvicorn
+google-cloud-storage

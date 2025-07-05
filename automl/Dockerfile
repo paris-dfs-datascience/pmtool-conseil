@@ -1,3 +1,4 @@
+# filename: Dockerfile
 # Use the official Python image from the Docker Hub
 FROM python:3.9-slim
 
@@ -17,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY main.py .
+COPY components/ ./components/
 
 # Expose port (Cloud Run uses PORT environment variable)
 EXPOSE 8080
