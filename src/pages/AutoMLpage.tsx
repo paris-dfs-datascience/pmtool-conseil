@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import FileBrowser from '../components/AutoML/FileBrowser';
 import EDAComponent from '../components/AutoML/EDAComponent';
-import { Cloud, Database, RefreshCw, BarChart3, Brain } from 'lucide-react';
+import AdvancedEDAComponent from '../components/AutoML/AdvancedEDAComponent'; // Add this import
+import { Cloud, Database, RefreshCw, BarChart3, Brain, Zap, Activity } from 'lucide-react';
 import type { Bucket, File } from '../components/AutoML/types';
 
 const AutoMLPage: React.FC = () => {
@@ -13,7 +14,8 @@ const AutoMLPage: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [showFileBrowser, setShowFileBrowser] = useState<boolean>(true);
-  const [activeSection, setActiveSection] = useState<'files' | 'analysis'>('files');
+  const [activeSection, setActiveSection] = useState<'files' | 'analysis' | 'advanced'>('files');
+  const [analysisMode, setAnalysisMode] = useState<'basic' | 'advanced'>('basic'); // Add this state
 
   // Fetch buckets on component mount
   useEffect(() => {
@@ -202,6 +204,23 @@ const AutoMLPage: React.FC = () => {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveSection('advanced')}
+              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                activeSection === 'advanced'
+                  ? 'bg-white text-purple-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              disabled={!selectedFile || selectedFile.type !== 'file'}
+            >
+              <Brain className="inline-block w-4 h-4 mr-2" />
+              Advanced Analytics
+              {selectedFile && selectedFile.type === 'file' && (
+                <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-600 text-xs rounded-full">
+                  Consultant Level
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -230,10 +249,57 @@ const AutoMLPage: React.FC = () => {
           {activeSection === 'analysis' && (
             <div className={showFileBrowser && activeSection === 'analysis' ? 'flex-1' : 'w-full'}>
               {selectedFile ? (
-                <EDAComponent
-                  selectedFile={selectedFile}
-                  bucketName={currentBucket?.name || ''}
-                />
+                <div className="space-y-4">
+                  {/* Analysis Mode Toggle */}
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-800">Analysis Mode</h3>
+                      <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
+                        <button
+                          onClick={() => setAnalysisMode('basic')}
+                          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                            analysisMode === 'basic'
+                              ? 'bg-white text-blue-600 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          <Activity className="inline-block w-4 h-4 mr-2" />
+                          Basic EDA
+                        </button>
+                        <button
+                          onClick={() => setAnalysisMode('advanced')}
+                          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                            analysisMode === 'advanced'
+                              ? 'bg-white text-purple-600 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          <Brain className="inline-block w-4 h-4 mr-2" />
+                          Advanced Analytics
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                      {analysisMode === 'basic' 
+                        ? 'Standard exploratory data analysis with statistical summaries and visualizations'
+                        : 'Advanced analytics with business insights, model readiness assessment, and strategic recommendations'
+                      }
+                    </p>
+                  </div>
+
+                  {/* Render appropriate component based on mode */}
+                  {analysisMode === 'basic' ? (
+                    <EDAComponent
+                      selectedFile={selectedFile}
+                      bucketName={currentBucket?.name || ''}
+                    />
+                  ) : (
+                    <AdvancedEDAComponent
+                      selectedFile={selectedFile}
+                      bucketName={currentBucket?.name || ''}
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="bg-white p-12 rounded-lg border border-gray-200 text-center">
                   <BarChart3 className="mx-auto mb-4 text-gray-400" size={64} />
@@ -251,10 +317,36 @@ const AutoMLPage: React.FC = () => {
               )}
             </div>
           )}
+
+          {/* Advanced Analytics Section */}
+          {activeSection === 'advanced' && (
+            <div className={showFileBrowser && activeSection === 'advanced' ? 'flex-1' : 'w-full'}>
+              {selectedFile ? (
+                <AdvancedEDAComponent
+                  selectedFile={selectedFile}
+                  bucketName={currentBucket?.name || ''}
+                />
+              ) : (
+                <div className="bg-white p-12 rounded-lg border border-gray-200 text-center">
+                  <Brain className="mx-auto mb-4 text-gray-400" size={64} />
+                  <h3 className="text-xl font-medium text-gray-600 mb-2">No File Selected</h3>
+                  <p className="text-gray-500 mb-6">
+                    Select a CSV or Excel file from the File Explorer to begin advanced analytics
+                  </p>
+                  <button
+                    onClick={() => setActiveSection('files')}
+                    className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                  >
+                    Go to File Explorer
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Show/Hide File Browser Toggle for Analysis View */}
-        {activeSection === 'analysis' && (
+        {/* Show/Hide File Browser Toggle for Analysis Views */}
+        {(activeSection === 'analysis' || activeSection === 'advanced') && (
           <button
             onClick={() => setShowFileBrowser(!showFileBrowser)}
             className="fixed bottom-6 right-6 p-3 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-colors z-50"
@@ -283,6 +375,13 @@ const AutoMLPage: React.FC = () => {
                 disabled={selectedFile.type !== 'file'}
               >
                 Analyze
+              </button>
+              <button
+                onClick={() => setActiveSection('advanced')}
+                className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                disabled={selectedFile.type !== 'file'}
+              >
+                Advanced
               </button>
             </div>
           </div>

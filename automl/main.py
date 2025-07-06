@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from components import gcloud_storage
 from components import eda
+from components import advanced_eda  # Add this import
 
 app = FastAPI()
 
@@ -15,9 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the gcloud_storage router
+# Include the routers
 app.include_router(gcloud_storage.router, prefix="/api")
 app.include_router(eda.eda_router, prefix="/api/eda", tags=["EDA"])
+app.include_router(advanced_eda.advanced_eda_router, prefix="/api", tags=["Advanced EDA"])  # Add this line
 
 
 if __name__ == "__main__":

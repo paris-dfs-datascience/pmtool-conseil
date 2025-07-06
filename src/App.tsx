@@ -169,6 +169,9 @@ function App() {
       case 'code':
         return <GitHubCodeAssistantPage authContext={authContext} />;
       case 'automl':
+        if (!user || !isAuthorized) {
+          return renderLMAPreviewPage();
+          }
         return <AutoMLPage />;
       case 'ocr':
         return <OCRToolPage authContext={authContext} />;

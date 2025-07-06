@@ -6,3 +6,13 @@ pandas
 numpy
 scipy
 scikit-learn
+seaborn
+matplotlib
+statsmodels
+joblib
+python-dateutil
+pytz
+openpyxl
+xlrd
+pytest
+pytest-asyncio
