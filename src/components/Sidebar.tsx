@@ -38,10 +38,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
       clearTimeout(hoverTimeoutRef.current);
     }
     
-    // Set a new timeout for 3 seconds
+    // Set a new timeout for 1 seconds
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
-    }, 2000);
+    }, 1000);
   };
 
   const handleMouseLeave = () => {

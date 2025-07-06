@@ -10,11 +10,18 @@ app = FastAPI()
 # Add CORS middleware to allow requests from your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to your frontend's URL in production
+    allow_origins=[
+        "https://lma-website-461920.web.app",  # Your production frontend
+        "http://localhost:3000",              # Local development
+        "http://localhost:5173",              # Vite dev server
+        "https://localhost:3000",             # HTTPS local
+        "*"                                   # Temporary - remove in production
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 # Include the routers
 app.include_router(gcloud_storage.router, prefix="/api")
