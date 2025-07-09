@@ -29,13 +29,17 @@ const AuthButton: React.FC<AuthButtonProps> = ({ user }) => {
     return (
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2">
-          {user.photoURL && (
-            <img
-              src={user.photoURL}
-              alt="Profile"
-              className="w-8 h-8 rounded-full"
-            />
-          )}
+          {(user.providerData?.[0]?.photoURL || user.photoURL) ? (
+              <img
+                src={user.providerData[0].photoURL || user.photoURL} // Use provider first since it works
+                alt="Profile"
+                className="w-10 h-10 rounded-full border-2 border-gray-200"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                <User size={20} className="text-white" />
+              </div>
+            )}
           <div className="hidden md:block">
             <p className="text-sm font-medium text-gray-700">{user.displayName}</p>
             <p className="text-xs text-gray-500">{user.email}</p>

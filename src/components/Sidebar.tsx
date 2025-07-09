@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState, useRef } from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, LogIn, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, Bug, LogIn, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 
@@ -14,6 +14,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuthorized }) => {
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
 
   const signInWithGoogle = async () => {
     try {
@@ -65,6 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
     { id: 'automl', icon: ChartScatter, label: 'AutoML' },
     { id: 'code', icon: Code, label: 'Code Assistant' },
     { id: 'ocr', icon: ScanSearch, label: 'OCR-Mistral' },
+    { id: 'claudecode', icon: Bug, label: 'Claude Code' },
   ];
 
   const getButtonClasses = (itemId: string, alwaysEnabled = false) => {
@@ -125,9 +127,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
               {/* User Avatar */}
               <div className="flex items-center p-2 rounded-lg mb-2">
                 <div className="flex-shrink-0">
-                  {user.photoURL ? (
+                {(user.providerData?.[0]?.photoURL || user.photoURL) ? (
                     <img
-                      src={user.photoURL}
+                      src={user.providerData[0].photoURL || user.photoURL} // Use provider first since it works
                       alt="Profile"
                       className="w-10 h-10 rounded-full border-2 border-gray-200"
                     />

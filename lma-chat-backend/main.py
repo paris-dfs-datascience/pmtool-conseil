@@ -24,22 +24,6 @@ logging.basicConfig(
 
 logger = logging.getLogger("main_app")
 
-# Add the current directory to Python path so modules can be found
-current_dir = Path(__file__).parent
-if str(current_dir) not in sys.path:
-    sys.path.insert(0, str(current_dir))
-
-# Set up logging early
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
-logger = logging.getLogger("main_app")
-
 logger.info("🚀 Starting LMA Chat API import process...")
 logger.info(f"Current working directory: {os.getcwd()}")
 logger.info(f"Python path: {sys.path}")
@@ -98,6 +82,7 @@ try:
         ('ConsultingPitch', 'consulting_router'),  # ConsultingPitch.py -> consulting_router
         ('CatalantPitch', 'catalant_router'),  # CatalantPitch.py -> catalant_router
         ('ChatClaude', 'claude_router'),  # ChatClaude.py -> claude_router
+        ('CodeAssistantClaude', 'claude_assistant_file_router'),  # This won't work because it's a folder now
     ]
     
     imported_routers = {}
@@ -119,7 +104,6 @@ try:
             logger.error(f"Full traceback: {traceback.format_exc()}")
             # Don't exit here, try to continue with other routers
     
-    # Try importing from directories
     # Try importing from directories with specific files
     try:
         logger.info("Attempting to import github_assistant router...")
@@ -132,6 +116,19 @@ try:
             logger.warning("⚠️ github_assistant __init__.py does not exist")
     except Exception as e:
         logger.error(f"❌ Failed to import github_assistant: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+    
+    try:
+        logger.info("Attempting to import claude_assistant router...")
+        if os.path.exists('routers/claude_assistant/__init__.py'):
+            # Import the correctly named router from the package
+            from routers.claude_assistant import claude_assistant_router
+            imported_routers['claude_assistant_router'] = claude_assistant_router
+            logger.info("✅ claude_assistant router imported as claude_assistant_router")
+        else:
+            logger.warning("⚠️ claude_assistant __init__.py does not exist")
+    except Exception as e:
+        logger.error(f"❌ Failed to import claude_assistant: {e}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
     
     try:
@@ -156,6 +153,7 @@ try:
     catalant_router = imported_routers.get('catalant_router')
     claude_router = imported_routers.get('claude_router')
     frameworks_router = imported_routers.get('frameworks_router')
+    claude_assistant_router = imported_routers.get('claude_assistant_router')
     
     logger.info(f"✅ Successfully imported {len(imported_routers)} routers")
     
@@ -185,7 +183,6 @@ middleware = [
         allow_methods=["*"],
         allow_headers=["*"],
     ),
-    # Remove the custom authentication middleware from here for now
 ]
 
 # Create the FastAPI app instance
@@ -241,6 +238,10 @@ try:
         app.include_router(catalant_router, prefix="/catalant", tags=["Catalant"])
     if claude_router:
         app.include_router(claude_router, prefix="/claude", tags=["Claude Chat"])
+    # IMPORTANT: This is the router your frontend needs - it expects /claude_assistant endpoints
+    if claude_assistant_router:
+        app.include_router(claude_assistant_router, prefix="/claude_assistant", tags=["Claude Code Assistant"])
+        logger.info("✅ Claude Assistant router included at /claude_assistant")
     if frameworks_router:
         app.include_router(frameworks_router, prefix="/frameworks", tags=["Consulting Frameworks"])
     

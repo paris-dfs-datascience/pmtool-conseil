@@ -9,7 +9,8 @@ const firebaseConfig = {
   projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
   storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: "G-EN1K9X096N"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -18,6 +19,8 @@ export const db = getFirestore(app);
 
 // Google Auth Provider
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('profile');  // Add this
+googleProvider.addScope('email');    // Add this
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
