@@ -1,7 +1,7 @@
 // src/pages/LMAPage.tsx
 import React, { useState } from 'react';
 import RAGChatInterface from '../components/LMARagChat/RAGChatInterface';
-import PromptLibrary from '../components/GeneralChats/PromptLibrary';
+import ConsultingPromptLibrary from '../components/LMARagChat/LMAPrompts';
 import { AuthContext } from '../types/auth';
 
 interface Message {
@@ -65,7 +65,7 @@ const LMAPage: React.FC<LMAPageProps> = ({ authContext }) => {
       
       {/* Prompt Library - 1/3 width */}
       <div className="w-1/3">
-        <PromptLibrary 
+        <ConsultingPromptLibrary 
           onSelectPrompt={(prompt) => handlePromptSelect(prompt, Date.now().toString())}
           selectedPromptId={selectedPromptId}
         />

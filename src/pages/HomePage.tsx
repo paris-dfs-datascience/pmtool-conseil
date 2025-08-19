@@ -1,6 +1,7 @@
 import React from 'react';
 import HeroSection from '../components/HomePageComponents/HeroSection';
 import ConseilSection from '../components/HomePageComponents/ConseilSection';
+import ConsultingSection from '../components/HomePageComponents/ConsultingSection';
 import LoomVideo from '../components/LoomVideo'; // Updated import
 import InteractiveLMADiagram from '../components/HomePageComponents/ConseilInteractiveDiagram';
 import DemoSignup from '../components/HomePageComponents/demo';
@@ -22,6 +23,7 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
   return (
     <div>
       <HeroSection user={user} />
+      <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}
       <ConseilSection />
       <div className="h-12"></div> {/* Adds 3rem (48px) of space */}

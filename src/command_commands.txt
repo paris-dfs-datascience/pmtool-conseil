@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v2.0, Fixed Authcomponent not rendinger photo - still need to fix advanced EDA fetch issue on bigger file, needs fix."
+git commit -m "LMA v2.0, added g-tag for demo submission"
 git push -u origin main

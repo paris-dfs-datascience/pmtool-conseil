@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LogIn } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
+import { auth, googleProvider, analytics } from './firebase';
 import GitHubCodeAssistantPage from './pages/GitHubCodeAssistantPage';
 import ChatPage from './pages/ChatPage';
 import HomePage from './pages/HomePage';
@@ -17,7 +17,8 @@ import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import { AuthContext } from './types/auth';
 import AuthButton from './components/AuthButton';
-import './index.css'; // Import the Tailwind CSS file
+import './index.css'; 
+import { logEvent } from 'firebase/analytics'; 
 
 interface User {
   displayName?: string | null;
@@ -51,9 +52,22 @@ function App() {
         setFirebaseToken(null);
       }
     };
-
     getToken();
   }, [user, isAuthorized]);
+
+  useEffect(() => {
+    try {
+      logEvent(analytics, 'page_view', {
+        page_title: activeTab,
+        page_location: window.location.href,
+        user_authenticated: !!user,
+        user_authorized: isAuthorized
+      });
+      console.log(`Analytics: Page view tracked for ${activeTab}`);
+    } catch (error) {
+      console.error('Error tracking page view:', error);
+    }
+  }, [activeTab, user, isAuthorized]);
 
   // Refresh token periodically (Firebase tokens expire after 1 hour)
   useEffect(() => {

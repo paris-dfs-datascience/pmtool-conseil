@@ -52,7 +52,7 @@ QUERY_PATTERNS = {
     }
 }
 
-def get_rag_tools(similarity_top_k=12):
+def get_rag_tools(similarity_top_k=20):
     """Get configured RAG tools with optimized settings"""
     retrieval = rag.Retrieval(
         source=rag.VertexRagStore(
@@ -137,7 +137,7 @@ Formatted text:"""
         response = format_model.generate_content(
             [format_prompt],
             generation_config={
-                "max_output_tokens": 4096,
+                "max_output_tokens": 8192,
                 "temperature": 0.1,  # Very low for consistent formatting
                 "top_p": 0.9,
             },
@@ -187,21 +187,29 @@ def enhance_query(query: str) -> tuple[str, str]:
     return enhanced_query, category
 
 def get_conversation_context(messages: List[Dict]) -> str:
-    """Extract relevant context from conversation history"""
     if len(messages) <= 1:
         return ""
     
-    # Get last 3 exchanges for context
-    recent_messages = messages[-6:]  # Last 3 back-and-forth
+    # Be generous with Gemini's large context window
+    recent_messages = messages[-20:]  # Last 10 exchanges
     context_parts = []
     
     for msg in recent_messages:
         role = msg.get('role', '')
         content = msg.get('content', '')
-        if content and len(content) < 200:  # Only short messages for context
+        if content:
+            # Only truncate extremely long individual messages
+            if len(content) > 1000:
+                content = content[:1000] + "..."
             context_parts.append(f"{role}: {content}")
     
-    return " | ".join(context_parts[-4:])  # Last 4 context pieces
+    context = " | ".join(context_parts)
+    
+    # Only truncate if context becomes unreasonably large (10K+ chars)
+    if len(context) > 10000:
+        context = context[-8000:]  # Keep the most recent 8K chars
+    
+    return context
 
 def choose_model_for_query(query: str, category: str) -> str:
     """Choose optimal model based on query complexity"""
@@ -274,7 +282,7 @@ Response Style: Professional, informative, and engaging - like a knowledgeable c
         response = model.generate_content(
             [full_query],
             generation_config={
-                "max_output_tokens": 4096,  # Good balance of detail vs speed
+                "max_output_tokens": 8192,  # Good balance of detail vs speed
                 "temperature": 0.1,         # Low for consistency
                 "top_p": 0.9,
                 "candidate_count": 1,

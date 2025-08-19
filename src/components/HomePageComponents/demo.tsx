@@ -3,6 +3,14 @@ import { Calendar, CheckCircle, User, Mail } from 'lucide-react';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebase.js'; // Adjust path to your Firebase config
 
+// Declare gtag and dataLayer for TypeScript
+declare global {
+  interface Window {
+    gtag: (command: string, targetId: string, config?: any) => void;
+    dataLayer: any[];
+  }
+}
+
 interface FormData {
   firstName: string;
   lastName: string;
@@ -64,6 +72,55 @@ const DemoSignup: React.FC = () => {
     }
   };
 
+  // Function to track Google Analytics and Google Ads conversions
+  const trackConversion = () => {
+    if (typeof window !== 'undefined' && window.gtag) {
+      // Track Google Analytics 4 event using your existing tag
+      window.gtag('event', 'demo_request_submitted', {
+        event_category: 'Lead Generation',
+        event_label: 'Demo Request Form',
+        value: 1,
+        custom_parameters: {
+          user_name: `${formData.firstName} ${formData.lastName}`,
+          user_email: formData.email
+        }
+      });
+
+      // Track Google Ads conversion using your existing Google tag
+      // The conversion will automatically be linked to your Google Ads account
+      // Replace CONVERSION_LABEL with the label from your Google Ads conversion action
+      window.gtag('event', 'conversion', {
+        send_to: 'GT-W6JK86Z9/CONVERSION_LABEL', // Use your existing tag ID with the conversion label
+        value: 2500.0,
+        currency: 'USD',
+        transaction_id: `demo_${Date.now()}_${formData.email}` // Unique transaction ID to prevent duplicates
+      });
+
+      console.log('Conversion tracked using existing Google tag');
+    }
+
+    // Backup method: Using Google Tag Manager dataLayer (if you're also using GTM)
+    if (typeof window !== 'undefined' && window.dataLayer) {
+      window.dataLayer.push({
+        event: 'demo_request_submitted',
+        event_category: 'Lead Generation',
+        event_label: 'Demo Request Form',
+        conversion_value: 2500,
+        user_data: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email
+        },
+        transaction_id: `demo_${Date.now()}_${formData.email}`
+      });
+
+      console.log('Conversion data pushed to dataLayer');
+    }
+
+    if (!window.gtag && !window.dataLayer) {
+      console.warn('Neither gtag nor dataLayer found - conversion tracking may not be working');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
@@ -96,6 +153,10 @@ const DemoSignup: React.FC = () => {
       });
 
       console.log('Demo request saved to Firebase');
+      
+      // Track Google Analytics conversion
+      trackConversion();
+      
       setIsSubmitted(true);
       
       // Open calendar link after a brief delay
@@ -140,9 +201,18 @@ const DemoSignup: React.FC = () => {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              // Track calendar click
+              if (typeof window !== 'undefined' && window.gtag) {
+                window.gtag('event', 'calendar_click', {
+                  event_category: 'Lead Generation',
+                  event_label: 'Schedule Meeting Button'
+                });
+              }
+            }}
           >
             <Calendar className="w-5 h-5 mr-2" />
-            Schedule Demo Now
+            Schedule a meeting now
           </a>
           
           <button
@@ -162,9 +232,9 @@ const DemoSignup: React.FC = () => {
         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Calendar className="w-6 h-6 text-blue-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Request a Demo</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Schedule an AI Assessment Now</h2>
         <p className="text-gray-600">
-          Get a personalized walkthrough of our platform and see how it can benefit your business.
+          Get a personalized walkthrough of our platform and see how we can benefit your business.
         </p>
       </div>
 
