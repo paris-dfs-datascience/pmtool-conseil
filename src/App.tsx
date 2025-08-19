@@ -18,7 +18,8 @@ import { useAuth } from './hooks/useAuth';
 import { AuthContext } from './types/auth';
 import AuthButton from './components/AuthButton';
 import './index.css'; 
-import { logEvent } from 'firebase/analytics'; 
+import { logEvent } from 'firebase/analytics';
+import { useEssentialTracking } from './tracking'; // Add tracking import
 
 interface User {
   displayName?: string | null;
@@ -31,6 +32,9 @@ function App() {
   const { user, loading, isAuthorized } = useAuth();
   const [firebaseToken, setFirebaseToken] = useState<string | null>(null);
   const [tokenLoading, setTokenLoading] = useState(false);
+  
+  // Initialize tracking
+  const { trackPageView, trackClick, trackTimeOnPage } = useEssentialTracking();
 
   // Get Firebase ID token when user changes
   useEffect(() => {
@@ -38,7 +42,6 @@ function App() {
       if (user && isAuthorized) {
         setTokenLoading(true);
         try {
-          // Get the Firebase ID token (this is what your backend needs)
           const token = await (user as any).getIdToken();
           setFirebaseToken(token);
           console.log('Firebase ID token obtained');
@@ -55,26 +58,32 @@ function App() {
     getToken();
   }, [user, isAuthorized]);
 
+  // Enhanced page view tracking combining Firebase Analytics + Google Analytics
   useEffect(() => {
     try {
+      // Your existing Firebase Analytics tracking
       logEvent(analytics, 'page_view', {
         page_title: activeTab,
         page_location: window.location.href,
         user_authenticated: !!user,
         user_authorized: isAuthorized
       });
-      console.log(`Analytics: Page view tracked for ${activeTab}`);
+      console.log(`Firebase Analytics: Page view tracked for ${activeTab}`);
+
+      // New Google Analytics tracking via gtag
+      trackPageView(`/${activeTab}`, activeTab);
+      
     } catch (error) {
       console.error('Error tracking page view:', error);
     }
-  }, [activeTab, user, isAuthorized]);
+  }, [activeTab, user, isAuthorized, trackPageView]);
 
-  // Refresh token periodically (Firebase tokens expire after 1 hour)
+  // Refresh token periodically
   useEffect(() => {
     if (user && isAuthorized && firebaseToken) {
       const refreshToken = async () => {
         try {
-          const token = await (user as any).getIdToken(true); // Force refresh
+          const token = await (user as any).getIdToken(true);
           setFirebaseToken(token);
           console.log('Firebase token refreshed');
         } catch (error) {
@@ -82,7 +91,6 @@ function App() {
         }
       };
 
-      // Refresh token every 50 minutes (before 1-hour expiry)
       const interval = setInterval(refreshToken, 50 * 60 * 1000);
       return () => clearInterval(interval);
     }
@@ -90,6 +98,12 @@ function App() {
 
   const signInWithGoogle = async () => {
     try {
+      // Track sign-in attempt
+      trackClick('Sign In with Google', 'auth_button', {
+        location: 'header',
+        auth_method: 'google'
+      });
+      
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error('Error signing in with Google:', error);
@@ -98,6 +112,12 @@ function App() {
 
   const handleSignOut = async () => {
     try {
+      // Track sign-out
+      trackClick('Sign Out', 'auth_button', {
+        location: 'header',
+        time_spent_total: trackTimeOnPage()
+      });
+      
       await signOut(auth);
       setFirebaseToken(null);
     } catch (error) {
@@ -106,14 +126,25 @@ function App() {
   };
 
   const handleAuthRequired = () => {
-    // This gets called if a chat component detects auth is needed
     console.log('Authentication required');
     if (!user) {
       signInWithGoogle();
     }
   };
 
-  // Create auth context object to pass to chat components
+  // Enhanced tab change with tracking (now handled in Sidebar, but keep for direct calls)
+  const handleTabChange = (tabName: string) => {
+    // Track navigation clicks (for cases where setActiveTab is called directly)
+    trackClick(`Direct Navigation - ${tabName}`, 'nav_direct', {
+      from_tab: activeTab,
+      to_tab: tabName,
+      user_authenticated: !!user,
+      user_authorized: isAuthorized
+    });
+    
+    setActiveTab(tabName);
+  };
+
   const authContext: AuthContext = {
     firebaseToken,
     firebaseUser: user,
@@ -128,8 +159,6 @@ function App() {
       </div>
     );
   }
-
-
 
   const renderLMAPreviewPage = () => {
     return (
@@ -151,7 +180,13 @@ function App() {
             </p>
           </div>
           <button
-            onClick={signInWithGoogle}
+            onClick={() => {
+              trackClick('LMA Preview - Sign In', 'cta_button', {
+                location: 'lma_preview',
+                page: 'lma'
+              });
+              signInWithGoogle();
+            }}
             className="flex items-center justify-center space-x-2 mx-auto px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             <LogIn size={16} />
@@ -182,7 +217,13 @@ function App() {
             </p>
           </div>
           <button
-            onClick={signInWithGoogle}
+            onClick={() => {
+              trackClick('AutoML Preview - Sign In', 'cta_button', {
+                location: 'automl_preview',
+                page: 'automl'
+              });
+              signInWithGoogle();
+            }}
             className="flex items-center justify-center space-x-2 mx-auto px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             <LogIn size={16} />
@@ -194,13 +235,10 @@ function App() {
   };
 
   const renderContent = () => {
-    // Always allow access to pages for demo purposes except LMA
-    // Authentication is handled at the API level
     switch (activeTab) {
       case 'home':
         return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
       case 'lma':
-        // LMA requires authentication - show preview if not authenticated
         if (!user || !isAuthorized) {
           return renderLMAPreviewPage();
         }
@@ -220,49 +258,61 @@ function App() {
       case 'automl':
         if (!user || !isAuthorized) {
           return renderAutoMLPreviewPage();
-          }
+        }
         return <AutoMLPage />;
       case 'ocr':
         return <OCRToolPage authContext={authContext} />;
-        default:
-          return (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <h1 className="text-2xl text-gray-500">Select a page</h1>
-              </div>
+      default:
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <h1 className="text-2xl text-gray-500">Select a page</h1>
             </div>
-          );
-      }
-    };
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-white">
-            <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex items-center space-x-3">
-                  <img
-                    src="/images/logo.png"
-                    alt="Le Marais Advisory Logo"
-                    className="w-8 h-8 rounded-lg"
-                  />
-                  <h1 className="text-xl font-semibold text-gray-800" style={{ fontFamily: 'Crimson Text, serif' }}>
-                    Le Marais Advisory
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <AuthButton user={user} />
-                {firebaseToken && (
-                  <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                    🔐 Authenticated
-                  </span>
-                )}
-              </div>
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <div className="flex items-center space-x-3">
+            <img
+              src="/images/logo.png"
+              alt="Le Marais Advisory Logo"
+              className="w-8 h-8 rounded-lg"
+              onClick={() => {
+                trackClick('Logo Click', 'logo', { location: 'header' });
+                handleTabChange('home');
+              }}
+              style={{ cursor: 'pointer' }}
+            />
+            <h1 
+              className="text-xl font-semibold text-gray-800 cursor-pointer" 
+              style={{ fontFamily: 'Crimson Text, serif' }}
+              onClick={() => {
+                trackClick('Company Name Click', 'brand_text', { location: 'header' });
+                handleTabChange('home');
+              }}
+            >
+              Le Marais Advisory
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center space-x-4">
+          <AuthButton user={user} />
+          {firebaseToken && (
+            <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+              🔐 Authenticated
+            </span>
+          )}
+        </div>
       </header>
       <div className="flex flex-1">
         <Sidebar
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={setActiveTab} // Sidebar now handles its own tracking
           user={user}
           isAuthorized={isAuthorized}
         />

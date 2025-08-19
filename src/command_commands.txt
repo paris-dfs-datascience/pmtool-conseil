@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v2.0, added g-tag for demo submission"
+git commit -m "LMA v2.0, added CTAs and analytics tracking"
 git push -u origin main
