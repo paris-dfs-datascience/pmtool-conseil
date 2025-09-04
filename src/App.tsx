@@ -20,6 +20,8 @@ import AuthButton from './components/AuthButton';
 import './index.css'; 
 import { logEvent } from 'firebase/analytics';
 import { useEssentialTracking } from './tracking'; // Add tracking import
+import ScriptRunnerPage from './pages/ScriptRunnerPage';
+
 
 interface User {
   displayName?: string | null;
@@ -235,43 +237,45 @@ function App() {
   };
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'home':
-        return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
-      case 'lma':
-        if (!user || !isAuthorized) {
-          return renderLMAPreviewPage();
-        }
-        return <LMAPage authContext={authContext} />;
-      case 'chat':
-        return <ChatPage authContext={authContext} />;
-      case 'claude':
-        return <ClaudePage authContext={authContext} />;
-      case 'moechat':
-        return <MOEChatPage authContext={authContext} />;
-      case 'framework':
-        return <ConsultingPage authContext={authContext} />;
-      case 'code':
-        return <GitHubCodeAssistantPage authContext={authContext} />;
-      case 'claudecode':
-        return <ClaudeCodePage authContext={authContext} />
-      case 'automl':
-        if (!user || !isAuthorized) {
-          return renderAutoMLPreviewPage();
-        }
-        return <AutoMLPage />;
-      case 'ocr':
-        return <OCRToolPage authContext={authContext} />;
-      default:
-        return (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <h1 className="text-2xl text-gray-500">Select a page</h1>
-            </div>
+  switch (activeTab) {
+    case 'home':
+      return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
+    case 'lma':
+      if (!user || !isAuthorized) {
+        return renderLMAPreviewPage();
+      }
+      return <LMAPage authContext={authContext} />;
+    case 'chat':
+      return <ChatPage authContext={authContext} />;
+    case 'claude':
+      return <ClaudePage authContext={authContext} />;
+    case 'moechat':
+      return <MOEChatPage authContext={authContext} />;
+    case 'framework':
+      return <ConsultingPage authContext={authContext} />;
+    case 'code':
+      return <GitHubCodeAssistantPage authContext={authContext} />;
+    case 'claudecode':
+      return <ClaudeCodePage authContext={authContext} />
+    case 'automl':
+      if (!user || !isAuthorized) {
+        return renderAutoMLPreviewPage();
+      }
+      return <AutoMLPage />;
+    case 'ocr':
+      return <OCRToolPage authContext={authContext} />;
+    case 'docprocessor':  // Add this new case
+      return <ScriptRunnerPage />;
+    default:
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h1 className="text-2xl text-gray-500">Select a page</h1>
           </div>
-        );
-    }
-  };
+        </div>
+      );
+  }
+};
 
   return (
     <div className="flex flex-col h-screen bg-white">

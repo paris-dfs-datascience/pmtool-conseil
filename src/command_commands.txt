@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v2.0, added CTAs and analytics tracking"
+git commit -m "LMA v2.0, working on docprocessor"
 git push -u origin main

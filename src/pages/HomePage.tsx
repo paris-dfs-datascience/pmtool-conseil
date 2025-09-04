@@ -80,29 +80,16 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
       </div>
       
       <div className="h-12"></div>
-      <div className="h-12"></div>
-      
-      {/* Conseil Section with tracking */}
-      <div data-section="conseil">
-        <ConseilSection />
+       {/* Consulting Overview with tracking */}
+      <div data-section="consulting_overview">
+        <ConsultingOverview />
       </div>
-      
       <div className="h-12"></div>
-      
-      {/* Video Section with tracking */}
-      <div data-section="video">
-        <LoomVideo 
-          videoId="861f3ab8f7be41b592900fb0487f5746"
-          sid="eed6c455-c340-4152-855c-c595cd3d2294"
-        />
-      </div>
-      
-      <div className="h-12"></div>
-      
       {/* Interactive Diagram with tracking */}
       <div data-section="interactive_diagram">
         <InteractiveLMADiagram />
       </div>
+      <div className="h-12"></div>
       
       <div className="h-12"></div>
       
@@ -117,12 +104,25 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
       </div>
       
       <div className="h-12"></div>
+      <div className="h-12"></div>
+
+      {/* Conseil Section with tracking */}
+      <div data-section="conseil">
+        <ConseilSection />
+      </div>
       
-      {/* Consulting Overview with tracking */}
-      <div data-section="consulting_overview">
-        <ConsultingOverview />
+      <div className="h-12"></div>
+      <div className="h-12"></div>
+
+      {/* Video Section with tracking */}
+      <div data-section="video">
+        <LoomVideo 
+          videoId="861f3ab8f7be41b592900fb0487f5746"
+          sid="eed6c455-c340-4152-855c-c595cd3d2294"
+        />
       </div>
     </div>
+    
   );
 };
 

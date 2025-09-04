@@ -191,7 +191,7 @@ const DemoSignup: React.FC = () => {
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
           <p className="text-gray-600">
-            Your demo request has been submitted successfully. You'll be redirected to our calendar to schedule your demo.
+            Your request has been submitted successfully. You'll be redirected to our calendar to schedule your meeting.
           </p>
         </div>
         
@@ -335,7 +335,7 @@ const DemoSignup: React.FC = () => {
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {isSubmitting ? 'Submitting...' : 'Request Demo'}
+          {isSubmitting ? 'Submitting...' : 'Talk to an Expert'}
         </button>
       </div>
 
