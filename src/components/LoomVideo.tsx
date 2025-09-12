@@ -5,15 +5,55 @@ interface LoomVideoProps {
   sid?: string;
   width?: string | number;
   height?: string | number;
+  aspectRatio?: 'ultra-wide' | 'wide' | 'standard' | 'compact' | 'fixed';
+  maxHeight?: string;
 }
 
 const LoomVideo: React.FC<LoomVideoProps> = ({ 
   videoId, 
   sid,
   width = "100%",
-  height = "500px"
+  height = "300px",
+  aspectRatio = 'wide',
+  maxHeight = '70vh' // Limit to 70% of viewport height
 }) => {
   const embedUrl = `https://www.loom.com/embed/${videoId}${sid ? `?sid=${sid}` : ''}`;
+  
+  // Different aspect ratios for better screen fitting
+  const getAspectRatio = () => {
+    switch (aspectRatio) {
+      case 'ultra-wide':
+        return '35%'; // ~21:9 aspect ratio
+      case 'wide':
+        return '42%'; // ~21:10 aspect ratio
+      case 'standard':
+        return '56.25%'; // 16:9 aspect ratio (original)
+      case 'compact':
+        return '50%'; // 2:1 aspect ratio
+      case 'fixed':
+        return 'auto'; // Use fixed height instead
+      default:
+        return '42%';
+    }
+  };
+
+  const containerStyle = aspectRatio === 'fixed' 
+    ? {
+        width: '90%',
+        maxWidth: '960px',
+        height: height,
+        maxHeight: maxHeight,
+        position: 'relative' as const
+      }
+    : {
+        width: '90%',
+        maxWidth: '960px',
+        position: 'relative' as const,
+        paddingBottom: getAspectRatio(),
+        height: 0,
+        overflow: 'hidden' as const,
+        maxHeight: maxHeight
+      };
   
   return (
     <div style={{
@@ -21,16 +61,9 @@ const LoomVideo: React.FC<LoomVideoProps> = ({
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: '20px 0'
+      padding: '5px 0'
     }}>
-      <div style={{
-        width: '90%',
-        maxWidth: '1200px',
-        position: 'relative',
-        paddingBottom: '56.25%', // 16:9 aspect ratio
-        height: 0,
-        overflow: 'hidden'
-      }}>
+      <div style={containerStyle}>
         <iframe
           src={embedUrl}
           frameBorder={0}

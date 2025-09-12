@@ -78,17 +78,26 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
       <div data-section="hero">
         <HeroSection user={user} />
       </div>
+
+      <div className="h-12"></div>
+       <div data-section="consulting_section">
+        <ConsultingSection />
+      </div>
       
+      {/* Video Section with tracking */}
+      <div data-section="video">
+        <LoomVideo 
+          videoId="e274be04259b42ef8452371eb0855f44"
+          sid="5037f673-4432-46a1-a736-7edf71ca9053"
+        />
+      </div>
+
       <div className="h-12"></div>
        {/* Consulting Overview with tracking */}
       <div data-section="consulting_overview">
         <ConsultingOverview />
       </div>
-      <div className="h-12"></div>
-      {/* Interactive Diagram with tracking */}
-      <div data-section="interactive_diagram">
-        <InteractiveLMADiagram />
-      </div>
+      
       <div className="h-12"></div>
       
       <div className="h-12"></div>
@@ -101,6 +110,12 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
         <div className="w-1/2 p-4">
           <Bio />
         </div>
+      </div>
+
+      <div className="h-12"></div>
+      {/* Interactive Diagram with tracking */}
+      <div data-section="interactive_diagram">
+        <InteractiveLMADiagram />
       </div>
       
       <div className="h-12"></div>

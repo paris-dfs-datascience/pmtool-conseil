@@ -15,6 +15,7 @@ interface ScriptRunnerPageProps {
 
 const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [email, setEmail] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [result, setResult] = useState<ScriptResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +23,13 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0] || null;
+    
+    if (file && !file.name.toLowerCase().endsWith('.docx')) {
+      setError('Please select a .docx file only');
+      setSelectedFile(null);
+      return;
+    }
+    
     setSelectedFile(file);
     setError(null);
     setResult(null);
@@ -33,6 +41,12 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
     
     const file = event.dataTransfer.files[0];
     if (file) {
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        setError('Please select a .docx file only');
+        setSelectedFile(null);
+        return;
+      }
+      
       setSelectedFile(file);
       setError(null);
       setResult(null);
@@ -49,9 +63,24 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
     setDragOver(false);
   };
 
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const runScript = async (): Promise<void> => {
     if (!selectedFile) {
-      setError('Please select a file first');
+      setError('Please select a .docx file first');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address');
       return;
     }
 
@@ -60,12 +89,13 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
     setResult(null);
 
     try {
-      // Create FormData to send the file
+      // Create FormData to send the file and email
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('email', email.trim());
       
-      // Replace with your actual cloud function URL
-      const response = await fetch('YOUR_CLOUD_FUNCTION_URL', {
+      // Call your Cloud Run API
+      const response = await fetch('https://document-processor-443545551926.us-central1.run.app/process', {
         method: 'POST',
         body: formData
       });
@@ -79,7 +109,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
       
     } catch (err) {
       console.error('Error running script:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to run script. Please try again.';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process document. Please try again.';
       setError(errorMessage);
     } finally {
       setIsUploading(false);
@@ -93,7 +123,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `script_result_${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `processed_document_${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -115,7 +145,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <h1 className="text-2xl font-bold text-gray-900">Script Runner</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Upload a file and run the processing script
+          Upload a .docx file and process it via email
         </p>
       </div>
 
@@ -145,7 +175,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
                 onChange={handleFileSelect}
                 className="hidden"
                 id="file-upload"
-                accept=".csv,.txt,.json,.xlsx,.xls" // Customize based on what your script accepts
+                accept=".docx"
               />
               
               <label htmlFor="file-upload" className="cursor-pointer">
@@ -170,7 +200,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
                           Drop your file here or click to browse
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
-                          Supports CSV, TXT, JSON, Excel files
+                          Supports .docx files only
                         </p>
                       </div>
                     </>
@@ -180,11 +210,26 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
             </div>
           </div>
 
+          {/* Email Input */}
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Address <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter email to receive processed document"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+
           {/* Run Button */}
           <div className="flex justify-center mb-8">
             <button
               onClick={runScript}
-              disabled={!selectedFile || isUploading}
+              disabled={!selectedFile || !email.trim() || isUploading}
               className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {isUploading ? (
@@ -195,7 +240,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
               ) : (
                 <>
                   <Play className="w-5 h-5" />
-                  <span>Run Script</span>
+                  <span>Process & Email Document</span>
                 </>
               )}
             </button>
@@ -219,7 +264,7 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                   <h3 className="text-lg font-medium text-green-800">
-                    Script Completed Successfully
+                    Document Processed Successfully
                   </h3>
                 </div>
                 {result.output && (
@@ -232,6 +277,9 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
                   </button>
                 )}
               </div>
+              <p className="text-sm text-green-700 mb-4">
+                Results have been sent to: <strong>{email}</strong>
+              </p>
               
               {/* Processing Stats */}
               {result.stats && (
@@ -278,16 +326,17 @@ const ScriptRunnerPage: React.FC<ScriptRunnerPageProps> = () => {
           <div className="mt-12 bg-gray-50 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">How to Use</h3>
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Select or drag & drop your file into the upload area</li>
-              <li>Click "Run Script" to process your file</li>
+              <li>Select or drag & drop your .docx file into the upload area</li>
+              <li>Enter the email address where you want to receive the processed document</li>
+              <li>Click "Process & Email Document" to start processing</li>
               <li>Wait for the processing to complete</li>
-              <li>View results and download the processed output</li>
+              <li>Check your email for the processed document</li>
             </ol>
             
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
               <p className="text-sm text-blue-700">
-                <strong>Note:</strong> Make sure your file is in the correct format. 
-                Processing time depends on file size and complexity.
+                <strong>Note:</strong> Only .docx files are supported. 
+                Processing time depends on document size and complexity.
               </p>
             </div>
           </div>

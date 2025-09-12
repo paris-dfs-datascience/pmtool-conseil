@@ -1,0 +1,8 @@
+fastapi==0.104.*
+uvicorn[standard]==0.24.*
+python-multipart==0.0.*
+python-docx==0.8.*
+python-magic==0.4.*
+defusedxml==0.7.*
+slowapi==0.1.*
+requests

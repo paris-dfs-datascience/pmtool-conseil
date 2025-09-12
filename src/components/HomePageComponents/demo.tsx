@@ -232,9 +232,9 @@ const DemoSignup: React.FC = () => {
         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Calendar className="w-6 h-6 text-blue-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Schedule an AI Assessment Now</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Talk to an expert</h2>
         <p className="text-gray-600">
-          Get a personalized walkthrough of our platform and see how we can benefit your business.
+          Get personalized recommendations for your AI journey.
         </p>
       </div>
 

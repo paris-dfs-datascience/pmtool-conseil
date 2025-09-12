@@ -21,6 +21,8 @@ import './index.css';
 import { logEvent } from 'firebase/analytics';
 import { useEssentialTracking } from './tracking'; // Add tracking import
 import ScriptRunnerPage from './pages/ScriptRunnerPage';
+import LandingPage from './pages/AdLandingPage';
+
 
 
 interface User {
@@ -79,6 +81,58 @@ function App() {
       console.error('Error tracking page view:', error);
     }
   }, [activeTab, user, isAuthorized, trackPageView]);
+
+  // Add URL parameter detection for hidden routes
+useEffect(() => {
+  const checkUrlParams = () => {
+    // Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const page = urlParams.get('page');
+    
+    if (page === 'docprocessor') {
+      setActiveTab('docprocessor');
+      return;
+    }
+    if (page === 'landing') {
+      setActiveTab('landing');
+      return;
+    }
+    
+    // Check hash routing as backup
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'docprocessor') {
+      setActiveTab('docprocessor');
+      return;
+    }
+    
+    // Check direct path (if you're using something like /docprocessor)
+    const path = window.location.pathname.replace('/', '');
+    if (path === 'docprocessor') {
+      setActiveTab('docprocessor');
+      return;
+    }
+    if (path === 'landing') {
+      setActiveTab('landing');
+      return;
+    }
+  };
+
+  // Check on initial load
+  checkUrlParams();
+
+  // Listen for URL changes (back/forward buttons)
+  const handlePopState = () => checkUrlParams();
+  window.addEventListener('popstate', handlePopState);
+  
+  // Listen for hash changes
+  const handleHashChange = () => checkUrlParams();
+  window.addEventListener('hashchange', handleHashChange);
+
+  return () => {
+    window.removeEventListener('popstate', handlePopState);
+    window.removeEventListener('hashchange', handleHashChange);
+  };
+}, []); // Empty dependency array so it only runs once on mount
 
   // Refresh token periodically
   useEffect(() => {
@@ -266,6 +320,8 @@ function App() {
       return <OCRToolPage authContext={authContext} />;
     case 'docprocessor':  // Add this new case
       return <ScriptRunnerPage />;
+    case 'landing':  // Add this new case
+      return <LandingPage />;
     default:
       return (
         <div className="flex items-center justify-center h-full">
