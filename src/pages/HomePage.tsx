@@ -113,18 +113,13 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
       </div>
 
       <div className="h-12"></div>
-      {/* Interactive Diagram with tracking */}
-      <div data-section="interactive_diagram">
-        <InteractiveLMADiagram />
-      </div>
-      
-      <div className="h-12"></div>
       <div className="h-12"></div>
 
       {/* Conseil Section with tracking */}
       <div data-section="conseil">
         <ConseilSection />
       </div>
+    
       
       <div className="h-12"></div>
       <div className="h-12"></div>
@@ -135,7 +130,16 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
           videoId="861f3ab8f7be41b592900fb0487f5746"
           sid="eed6c455-c340-4152-855c-c595cd3d2294"
         />
+
+        <div className="h-12"></div>
+      {/* Interactive Diagram with tracking */}
+      <div data-section="interactive_diagram">
+        <InteractiveLMADiagram />
       </div>
+      </div>
+
+      <div className="h-12"></div>
+
     </div>
     
   );

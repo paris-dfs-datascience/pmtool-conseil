@@ -75,7 +75,7 @@ def table_text_format(doc: Document) -> Document:
     """Format document tables with proper spacing and fonts"""
     logger.info('Starting document formatting....')
     spacing = 0
-    font_changes = 0
+    bold_changes = 0
     sources = 0
     
     # Remove spacing from paragraphs in tables and set font
@@ -116,11 +116,11 @@ def table_text_format(doc: Document) -> Document:
                                 run.font.bold = True
                             else:
                                 run.font.bold = False
-                        font_changes += 1
+                        bold_changes += 1
 
     logger.info(f'Completed {spacing} Spacing Updates')
     logger.info(f'Completed {sources} Sources Consulted Updates') 
-    logger.info(f'Completed {font_changes} Font Updates')
+    logger.info(f'Completed {bold_changes} Font Updates')
     logger.info('Completed Document Formatting')
     return doc
 

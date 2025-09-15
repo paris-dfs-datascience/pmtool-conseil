@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v2.0, working on docprocessor"
+git commit -m "LMA v2.0, docpressor v1"
 git push -u origin main
