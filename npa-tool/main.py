@@ -98,25 +98,61 @@ def table_text_format(doc: Document) -> Document:
                     
                     # Define social media platforms to make bold
                     social_platforms = [
-                        'LinkedIn:', 'Facebook:', 'Venmo:', 'Youtube:', 'Instagram:',
+                        'LinkedIn:', 'Facebook:', 'Venmo:', 'YouTube:', 'Instagram:',
                         'X (fka Twitter):', 'Medium.com:', 'Tiktok:', 'Bluesky:'
                     ]
-                    
-                    for run in paragraph.runs:
-                        run.font.name = 'Helvetica'
-                        run.font.size = Pt(11)
-                        if paragraph.style.name.startswith('Heading'):
-                            continue
-                        else:
-                            # Check if this run contains any social media platform names
-                            run_text = run.text
-                            should_be_bold = any(platform in run_text for platform in social_platforms)
-                            
-                            if should_be_bold:
+
+                    # Get the full paragraph text to search across all runs
+                    full_paragraph_text = paragraph.text
+
+                    # Check if any platform exists in this paragraph
+                    platforms_in_paragraph = [platform for platform in social_platforms if platform in full_paragraph_text]
+
+                    if platforms_in_paragraph:
+                        # If platforms found, rebuild the paragraph to properly format them
+                        paragraph.clear()
+                        
+                        # Process each platform found
+                        remaining_text = full_paragraph_text
+                        
+                        for platform in platforms_in_paragraph:
+                            if platform in remaining_text:
+                                # Split around the platform
+                                before, separator, after = remaining_text.partition(platform)
+                                
+                                # Add text before platform (normal formatting)
+                                if before:
+                                    run = paragraph.add_run(before)
+                                    run.font.name = 'Helvetica'
+                                    run.font.size = Pt(11)
+                                    run.font.bold = False
+                                
+                                # Add platform (bold)
+                                run = paragraph.add_run(platform)
+                                run.font.name = 'Helvetica'
+                                run.font.size = Pt(11)
                                 run.font.bold = True
-                            else:
-                                run.font.bold = False
+                                
+                                # Continue with remaining text
+                                remaining_text = after
+                                break  # Process one platform at a time to avoid conflicts
+                        
+                        # Add any remaining text
+                        if remaining_text:
+                            run = paragraph.add_run(remaining_text)
+                            run.font.name = 'Helvetica'
+                            run.font.size = Pt(11)
+                            run.font.bold = False
+                            
                         bold_changes += 1
+                    else:
+                        # No platforms found, apply normal formatting
+                        for run in paragraph.runs:
+                            run.font.name = 'Helvetica'
+                            run.font.size = Pt(11)
+                            if not paragraph.style.name.startswith('Heading'):
+                                run.font.bold = False
+                            bold_changes += 1
 
     logger.info(f'Completed {spacing} Spacing Updates')
     logger.info(f'Completed {sources} Sources Consulted Updates') 
