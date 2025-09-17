@@ -102,51 +102,44 @@ def table_text_format(doc: Document) -> Document:
                         'X (fka Twitter):', 'Medium.com:', 'Tiktok:', 'Bluesky:'
                     ]
 
-                    # Get the full paragraph text to search across all runs
-                    full_paragraph_text = paragraph.text
-
-                    # Check if any platform exists in this paragraph
-                    platforms_in_paragraph = [platform for platform in social_platforms if platform in full_paragraph_text]
+                    # Check if paragraph contains any platforms
+                    full_text = paragraph.text
+                    platforms_in_paragraph = [p for p in social_platforms if p in full_text]
 
                     if platforms_in_paragraph:
-                        # If platforms found, rebuild the paragraph to properly format them
-                        paragraph.clear()
+                        logger.info(f"Paragraph contains platforms: {platforms_in_paragraph}")
+                        logger.info(f"Full paragraph text: '{full_text}'")
                         
-                        # Process each platform found
-                        remaining_text = full_paragraph_text
-                        
-                        for platform in platforms_in_paragraph:
-                            if platform in remaining_text:
-                                # Split around the platform
-                                before, separator, after = remaining_text.partition(platform)
-                                
-                                # Add text before platform (normal formatting)
-                                if before:
-                                    run = paragraph.add_run(before)
-                                    run.font.name = 'Helvetica'
-                                    run.font.size = Pt(11)
-                                    run.font.bold = False
-                                
-                                # Add platform (bold)
-                                run = paragraph.add_run(platform)
-                                run.font.name = 'Helvetica'
-                                run.font.size = Pt(11)
-                                run.font.bold = True
-                                
-                                # Continue with remaining text
-                                remaining_text = after
-                                break  # Process one platform at a time to avoid conflicts
-                        
-                        # Add any remaining text
-                        if remaining_text:
-                            run = paragraph.add_run(remaining_text)
+                        # Simple approach: if paragraph contains platform, check each run
+                        for run in paragraph.runs:
                             run.font.name = 'Helvetica'
                             run.font.size = Pt(11)
-                            run.font.bold = False
                             
-                        bold_changes += 1
+                            if paragraph.style.name.startswith('Heading'):
+                                continue
+                            
+                            run_text = run.text
+                            logger.info(f"Checking run: '{run_text}'")
+                            
+                            # Check if this run text appears in any of the platforms found in paragraph
+                            should_be_bold = False
+                            for platform in platforms_in_paragraph:
+                                if run_text in platform or platform in run_text:
+                                    should_be_bold = True
+                                    logger.info(f"Run '{run_text}' matches platform '{platform}'")
+                                    break
+                                # Also check if run text is a significant part
+                                elif len(run_text.strip()) > 2 and run_text.strip() in platform:
+                                    should_be_bold = True
+                                    logger.info(f"Run '{run_text}' is part of platform '{platform}'")
+                                    break
+                            
+                            run.font.bold = should_be_bold
+                            if should_be_bold:
+                                logger.info(f"Made BOLD: '{run_text}'")
+                            bold_changes += 1
                     else:
-                        # No platforms found, apply normal formatting
+                        # Regular formatting
                         for run in paragraph.runs:
                             run.font.name = 'Helvetica'
                             run.font.size = Pt(11)
