@@ -1,1 +1,5 @@
 gcloud builds submit --config cloudbuild.yaml .
+
+git add .
+git commit -m "LMA v2.0, fixed NPA-Tool. Stable version of NPA Tool 1.0"
+git push -u origin main
