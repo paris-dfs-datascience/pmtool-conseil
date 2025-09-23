@@ -83,6 +83,22 @@ def table_text_format(doc: Document) -> Document:
         for row in table.rows:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
+                    logger.info(f"Paragraph style name: '{paragraph.style.name}'")
+                    # Check if this is a header paragraph
+                    is_header = (
+                        paragraph.style.name.startswith('Heading') or
+                        paragraph.style.name.startswith('Title') or
+                        paragraph.style.name.startswith('Subject Name') or
+                        'subject name' in paragraph.style.name.lower() or
+                        'heading' in paragraph.style.name.lower() or
+                        'title' in paragraph.style.name.lower()
+                    )
+                    
+                    # If it's a header, skip all formatting and continue to next paragraph
+                    if is_header:
+                        logger.info(f"Skipping header paragraph with style: {paragraph.style.name}")
+                        continue
+                    
                     paragraph.paragraph_format.space_before = Pt(0)
                     paragraph.paragraph_format.space_after = Pt(0)
                     paragraph.paragraph_format.line_spacing = 1.07
@@ -115,9 +131,6 @@ def table_text_format(doc: Document) -> Document:
                             run.font.name = 'Helvetica'
                             run.font.size = Pt(11)
                             
-                            if paragraph.style.name.startswith('Heading'):
-                                continue
-                            
                             run_text = run.text
                             logger.info(f"Checking run: '{run_text}'")
                             
@@ -143,8 +156,7 @@ def table_text_format(doc: Document) -> Document:
                         for run in paragraph.runs:
                             run.font.name = 'Helvetica'
                             run.font.size = Pt(11)
-                            if not paragraph.style.name.startswith('Heading'):
-                                run.font.bold = False
+                            run.font.bold = False
                             bold_changes += 1
 
     logger.info(f'Completed {spacing} Spacing Updates')
