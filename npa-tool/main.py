@@ -100,12 +100,18 @@ def table_text_format(doc: Document) -> Document:
                         continue
                     
                     paragraph.paragraph_format.space_before = Pt(0)
-                    paragraph.paragraph_format.space_after = Pt(0)
+                    paragraph.paragraph_format.space_after = Pt(3)
                     paragraph.paragraph_format.line_spacing = 1.07
-                    
-                    # If paragraph has text, set after spacing to 6pt
-                    if paragraph.text.strip():
+
+                    if paragraph.style.name.startswith('List Paragraph'):
                         paragraph.paragraph_format.space_after = Pt(6)
+                        paragraph.paragraph_format.line_spacing = 1.07
+                        logger.info(f"List Updated")
+                        continue
+
+                    # If paragraph has text, set after spacing to 3pt
+                    if paragraph.text.strip():
+                        paragraph.paragraph_format.space_after = Pt(3)
                         spacing += 1
                     if 'Sources consulted' in paragraph.text:
                         paragraph.paragraph_format.space_before = Pt(0)
@@ -115,7 +121,7 @@ def table_text_format(doc: Document) -> Document:
                     # Define social media platforms to make bold
                     social_platforms = [
                         'LinkedIn:', 'Facebook:', 'Venmo:', 'YouTube:', 'Instagram:',
-                        'X (fka Twitter):', 'Medium.com:', 'Tiktok:', 'Bluesky:'
+                        'X (fka Twitter):', 'Medium.com:', 'Tiktok:', 'Bluesky:', 'Pinterest:'
                     ]
 
                     # Check if paragraph contains any platforms
