@@ -100,7 +100,7 @@ def table_text_format(doc: Document) -> Document:
                         continue
                     
                     paragraph.paragraph_format.space_before = Pt(0)
-                    paragraph.paragraph_format.space_after = Pt(3)
+                    paragraph.paragraph_format.space_after = Pt(0)
                     paragraph.paragraph_format.line_spacing = 1.07
 
                     if paragraph.style.name.startswith('List Paragraph'):
@@ -111,7 +111,7 @@ def table_text_format(doc: Document) -> Document:
 
                     # If paragraph has text, set after spacing to 3pt
                     if paragraph.text.strip():
-                        paragraph.paragraph_format.space_after = Pt(3)
+                        paragraph.paragraph_format.space_after = Pt(6)
                         spacing += 1
                     if 'Sources consulted' in paragraph.text:
                         paragraph.paragraph_format.space_before = Pt(0)
