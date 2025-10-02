@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v2.0, fixed NPA-Tool. Stable version of NPA Tool 1.0"
+git commit -m "LMA v3.0, Added BluePrint page"
 git push -u origin main

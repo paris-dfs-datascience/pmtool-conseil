@@ -24,7 +24,6 @@ import ScriptRunnerPage from './pages/ScriptRunnerPage';
 import LandingPage from './pages/AdLandingPage';
 
 
-
 interface User {
   displayName?: string | null;
   email?: string | null;
@@ -93,8 +92,8 @@ useEffect(() => {
       setActiveTab('docprocessor');
       return;
     }
-    if (page === 'landing') {
-      setActiveTab('landing');
+    if (page === 'blueprint') {
+      setActiveTab('blueprint');
       return;
     }
     
@@ -111,8 +110,8 @@ useEffect(() => {
       setActiveTab('docprocessor');
       return;
     }
-    if (path === 'landing') {
-      setActiveTab('landing');
+    if (path === 'blueprint') {
+      setActiveTab('blueprint');
       return;
     }
   };
@@ -320,7 +319,7 @@ useEffect(() => {
       return <OCRToolPage authContext={authContext} />;
     case 'docprocessor':  // Add this new case
       return <ScriptRunnerPage />;
-    case 'landing':  // Add this new case
+    case 'blueprint':  // Add this new case
       return <LandingPage />;
     default:
       return (

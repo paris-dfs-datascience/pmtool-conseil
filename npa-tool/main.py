@@ -30,7 +30,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Security configuration
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
+MAX_FILE_SIZE = 30 * 1024 * 1024  # 10MB limit
 ALLOWED_MIME_TYPES = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 }

@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState, useRef } from 'react';
-import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, Bug, LogIn, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
+import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, Bug, LogIn, Map, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
 import { useEssentialTracking } from '../tracking'; // Import tracking
@@ -118,6 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
 
   const navItems = [
     { id: 'home', icon: Home, label: 'Home', alwaysEnabled: true },
+    { id: 'blueprint', icon: Map, label: '2-Week BluePrint', alwaysEnabled: true },
     { id: 'chat', icon: MessageCircle, label: 'Gemini AI Chat' },
     { id: 'claude', icon: Brain, label: 'Claude AI' },
     { id: 'moechat', icon: Beaker, label: 'MoE AI Chat' },
