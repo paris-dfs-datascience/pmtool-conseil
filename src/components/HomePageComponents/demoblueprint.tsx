@@ -132,9 +132,9 @@ const DemoSignup: React.FC = () => {
         // Hardcoded email fields for the Trigger Email extension
         to: 'matthew.paris@lemaraisadvisory.com', // Email
         message: {
-          subject: 'New Demo Request',
+          subject: 'New BluePrint Demo Request',
           html: `
-            <h2>New Demo Request</h2>
+            <h2>New BluePrint Demo Request</h2>
             <p><strong>Name:</strong> ${formData.firstName} ${formData.lastName}</p>
             <p><strong>Email:</strong> ${formData.email}</p>
             <p><strong>Message:</strong> ${formData.message || 'No additional message provided'}</p>

@@ -121,13 +121,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
     { id: 'blueprint', icon: Map, label: '2-Week BluePrint', alwaysEnabled: true },
     { id: 'chat', icon: MessageCircle, label: 'Gemini AI Chat' },
     { id: 'claude', icon: Brain, label: 'Claude AI' },
-    { id: 'moechat', icon: Beaker, label: 'MoE AI Chat' },
     { id: 'framework', icon: LayoutList, label: 'Framework Assistant' },
     { id: 'lma', icon: FerrisWheel, label: 'LMA Assistant' },
     { id: 'automl', icon: ChartScatter, label: 'AutoML' },
     { id: 'code', icon: Code, label: 'Code Assistant' },
-    { id: 'ocr', icon: ScanSearch, label: 'OCR-Mistral' },
-    { id: 'claudecode', icon: Bug, label: 'Claude Code' },
   ];
 
   const getButtonClasses = (itemId: string, alwaysEnabled = false) => {

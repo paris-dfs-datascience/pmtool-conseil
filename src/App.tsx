@@ -8,11 +8,8 @@ import HomePage from './pages/HomePage';
 import ConsultingPage from './pages/ConsultingPage';
 import LMAPage from './pages/LMAPage';
 import AutoMLPage from './pages/AutoMLpage';
-import OCRToolPage from './pages/OCRPage';
-import ClaudeCodePage from './pages/ClaudeCodeAssistantPage'
 import UnauthorizedPage from './components/UnauthorizedPage';
 import ClaudePage from './pages/ClaudePage';
-import MOEChatPage from './pages/MOEChatPage';
 import Sidebar from './components/Sidebar';
 import { useAuth } from './hooks/useAuth';
 import { AuthContext } from './types/auth';
@@ -302,21 +299,15 @@ useEffect(() => {
       return <ChatPage authContext={authContext} />;
     case 'claude':
       return <ClaudePage authContext={authContext} />;
-    case 'moechat':
-      return <MOEChatPage authContext={authContext} />;
     case 'framework':
       return <ConsultingPage authContext={authContext} />;
     case 'code':
       return <GitHubCodeAssistantPage authContext={authContext} />;
-    case 'claudecode':
-      return <ClaudeCodePage authContext={authContext} />
     case 'automl':
       if (!user || !isAuthorized) {
         return renderAutoMLPreviewPage();
       }
       return <AutoMLPage />;
-    case 'ocr':
-      return <OCRToolPage authContext={authContext} />;
     case 'docprocessor':  // Add this new case
       return <ScriptRunnerPage />;
     case 'blueprint':  // Add this new case
