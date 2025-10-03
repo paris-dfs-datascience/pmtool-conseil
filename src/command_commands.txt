@@ -2,5 +2,5 @@ firebase login --no-localhost
 
 
 git add .
-git commit -m "LMA v3.0, Updated BluePrint page"
+git commit -m "LMA v3.0, added BluePrint hero image"
 git push -u origin main

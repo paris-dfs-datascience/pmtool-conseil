@@ -138,6 +138,25 @@ export default function AIBluePrintLanding() {
         </div>
       </header>
 
+        {/* Hero Image Section */}
+      <section className="relative h-[500px] md:h-[600px] overflow-hidden">
+        <img
+          src="/images/BluePrintDemo/2week_AI_BluePrint.png"
+          alt="AI Blueprint Hero"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 flex items-center justify-end pr-12 md:pr-24">
+          <div className="text-right">
+            <div className="text-6xl md:text-8xl font-bold" style={{ color: '#001f3f' }}>
+              LMA
+            </div>
+            <div className="text-6xl md:text-8xl font-bold" style={{ color: '#00a7f2' }}>
+              BluePrint
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
