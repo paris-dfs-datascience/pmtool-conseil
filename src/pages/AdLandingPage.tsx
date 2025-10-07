@@ -323,13 +323,9 @@ export default function AIBluePrintLanding() {
           
           <div className="grid md:grid-cols-2 gap-6">
             {[
-              'Business Goals Analysis Document',
               'AI Opportunity Assessment Report',
               'Data & Technology Readiness Evaluation',
               'Prioritized Use Case Recommendations',
-              'Risk & Compliance Analysis',
-              'Organizational Change Management Plan',
-              'Detailed Implementation Roadmap with KPIs',
               'Executive Presentation Materials'
             ].map((item, idx) => (
               <div key={idx} className="flex items-start space-x-4 bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
