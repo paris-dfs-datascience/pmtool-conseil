@@ -76,10 +76,10 @@ const DemoSignup: React.FC = () => {
   const trackConversion = () => {
     if (typeof window !== 'undefined' && window.gtag) {
       // Track Google Analytics 4 event using your existing tag
-      window.gtag('event', 'demo_request_submitted', {
+      window.gtag('event', 'BluePrint_Submitted', {
         event_category: 'Lead Generation',
-        event_label: 'Demo Request Form',
-        value: 1,
+        event_label: 'BluePrint Form Submitted',
+        value: 2500,
         custom_parameters: {
           user_name: `${formData.firstName} ${formData.lastName}`,
           user_email: formData.email
@@ -102,9 +102,9 @@ const DemoSignup: React.FC = () => {
     // Backup method: Using Google Tag Manager dataLayer (if you're also using GTM)
     if (typeof window !== 'undefined' && window.dataLayer) {
       window.dataLayer.push({
-        event: 'demo_request_submitted',
+        event: 'BluePrint_Submitted',
         event_category: 'Lead Generation',
-        event_label: 'Demo Request Form',
+        event_label: 'BluePrint Form Submitted',
         conversion_value: 2500,
         user_data: {
           name: `${formData.firstName} ${formData.lastName}`,

@@ -1,7 +1,7 @@
 // src/components/AuthButton.tsx
 import React from 'react';
-import { signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../firebase';
 import { User, LogIn, LogOut } from 'lucide-react';
 
 interface AuthButtonProps {
@@ -11,9 +11,23 @@ interface AuthButtonProps {
 const AuthButton: React.FC<AuthButtonProps> = ({ user }) => {
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Error signing in with Google:', error);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      // Handle specific errors gracefully
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('Sign-in cancelled by user');
+        // Don't show error - user intentionally closed it
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        console.log('Another sign-in popup is already open');
+      } else {
+        console.error('Error signing in with Google:', error);
+        // Only show actual errors to user
+      }
     }
   };
 
@@ -31,7 +45,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({ user }) => {
         <div className="flex items-center space-x-2">
           {(user.providerData?.[0]?.photoURL || user.photoURL) ? (
               <img
-                src={user.providerData[0].photoURL || user.photoURL} // Use provider first since it works
+                src={user.providerData[0].photoURL || user.photoURL}
                 alt="Profile"
                 className="w-10 h-10 rounded-full border-2 border-gray-200"
               />

@@ -16,10 +16,15 @@ import { AuthContext } from './types/auth';
 import AuthButton from './components/AuthButton';
 import './index.css'; 
 import { logEvent } from 'firebase/analytics';
-import { useEssentialTracking } from './tracking'; // Add tracking import
+import { useEssentialTracking } from './tracking';
 import ScriptRunnerPage from './pages/ScriptRunnerPage';
-import LandingPage from './pages/AdLandingPage';
-
+import SPRtest from './pages/SRPtest';
+import LandingPage from './pages/BluePrintLanding';
+import GoogleMapsCompetitiveIntel from './bluepeakdemo/map_data';
+import DQEMap from './components/dqe-maps/dqe-map'
+import LeadsDashboard from './components/LMA_Leads/LMA_Leads';
+import FileUploader from './components/ben_upload'
+import DQEPasswordGate from './components/dqe-maps/dqepassword';
 
 interface User {
   displayName?: string | null;
@@ -79,56 +84,108 @@ function App() {
   }, [activeTab, user, isAuthorized, trackPageView]);
 
   // Add URL parameter detection for hidden routes
-useEffect(() => {
-  const checkUrlParams = () => {
-    // Check URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const page = urlParams.get('page');
-    
-    if (page === 'docprocessor') {
-      setActiveTab('docprocessor');
-      return;
-    }
-    if (page === 'blueprint') {
-      setActiveTab('blueprint');
-      return;
-    }
-    
-    // Check hash routing as backup
-    const hash = window.location.hash.replace('#', '');
-    if (hash === 'docprocessor') {
-      setActiveTab('docprocessor');
-      return;
-    }
-    
-    // Check direct path (if you're using something like /docprocessor)
-    const path = window.location.pathname.replace('/', '');
-    if (path === 'docprocessor') {
-      setActiveTab('docprocessor');
-      return;
-    }
-    if (path === 'blueprint') {
-      setActiveTab('blueprint');
-      return;
-    }
-  };
+  useEffect(() => {
+    const checkUrlParams = () => {
+      // Check URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const page = urlParams.get('page');
+      
+      if (page === 'docprocessor') {
+        setActiveTab('docprocessor');
+        return;
+      }
+      if (page === 'bpmap') {
+        setActiveTab('bpmap');
+        return;
+      }
+      if (page === 'dqemap') {
+        setActiveTab('dqemap');
+        return;
+      }
+      if (page === 'lead') {
+        setActiveTab('lead');
+        return;
+      }
+      if (page === 'blueprint') {
+        setActiveTab('blueprint');
+        return;
+      }
+      if (page === 'ben') {
+        setActiveTab('ben');
+        return;
+      }
+      
+      // Check hash routing as backup
+      const hash = window.location.hash.replace('#', '');
+      if (hash === 'docprocessor') {
+        setActiveTab('docprocessor');
+        return;
+      }
+      if (hash === 'bpmap') {
+        setActiveTab('bpmap');
+        return;
+      }
+      if (hash === 'dqemap') {
+        setActiveTab('dqemap');
+        return;
+      }
+      if (hash === 'lead') {
+        setActiveTab('lead');
+        return;
+      }
+      if (hash === 'blueprint') {
+        setActiveTab('blueprint');
+        return;
+      }
+      if (hash === 'ben') {
+        setActiveTab('ben');
+        return;
+      }
+      
+      // Check direct path (if you're using something like /docprocessor)
+      const path = window.location.pathname.replace('/', '');
+      if (path === 'docprocessor') {
+        setActiveTab('docprocessor');
+        return;
+      }
+      if (path === 'bpmap') {
+        setActiveTab('bpmap');
+        return;
+      }
+      if (path === 'dqemap') {
+        setActiveTab('dqemap');
+        return;
+      }
+      if (path === 'lead') {
+        setActiveTab('lead');
+        return;
+      }
+      if (path === 'blueprint') {
+        setActiveTab('blueprint');
+        return;
+      }
+      if (path === 'ben') {
+        setActiveTab('ben');
+        return;
+      }
+    };
 
-  // Check on initial load
-  checkUrlParams();
+    // Check on initial load
+    checkUrlParams();
 
-  // Listen for URL changes (back/forward buttons)
-  const handlePopState = () => checkUrlParams();
-  window.addEventListener('popstate', handlePopState);
-  
-  // Listen for hash changes
-  const handleHashChange = () => checkUrlParams();
-  window.addEventListener('hashchange', handleHashChange);
+    // Listen for URL changes (back/forward buttons)
+    const handlePopState = () => checkUrlParams();
+    window.addEventListener('popstate', handlePopState);
+    
+    // Listen for hash changes
+    const handleHashChange = () => checkUrlParams();
+    window.addEventListener('hashchange', handleHashChange);
 
-  return () => {
-    window.removeEventListener('popstate', handlePopState);
-    window.removeEventListener('hashchange', handleHashChange);
-  };
-}, []); // Empty dependency array so it only runs once on mount
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []); // Empty dependency array so it only runs once on mount
 
   // Refresh token periodically
   useEffect(() => {
@@ -287,41 +344,53 @@ useEffect(() => {
   };
 
   const renderContent = () => {
-  switch (activeTab) {
-    case 'home':
-      return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
-    case 'lma':
-      if (!user || !isAuthorized) {
-        return renderLMAPreviewPage();
-      }
-      return <LMAPage authContext={authContext} />;
-    case 'chat':
-      return <ChatPage authContext={authContext} />;
-    case 'claude':
-      return <ClaudePage authContext={authContext} />;
-    case 'framework':
-      return <ConsultingPage authContext={authContext} />;
-    case 'code':
-      return <GitHubCodeAssistantPage authContext={authContext} />;
-    case 'automl':
-      if (!user || !isAuthorized) {
-        return renderAutoMLPreviewPage();
-      }
-      return <AutoMLPage />;
-    case 'docprocessor':  // Add this new case
-      return <ScriptRunnerPage />;
-    case 'blueprint':  // Add this new case
-      return <LandingPage />;
-    default:
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <h1 className="text-2xl text-gray-500">Select a page</h1>
+    switch (activeTab) {
+      case 'home':
+        return <HomePage user={user || undefined} isAuthorized={isAuthorized} />;
+      case 'lma':
+        if (!user || !isAuthorized) {
+          return renderLMAPreviewPage();
+        }
+        return <LMAPage authContext={authContext} />;
+      case 'chat':
+        return <ChatPage authContext={authContext} />;
+      case 'claude':
+        return <ClaudePage authContext={authContext} />;
+      case 'framework':
+        return <ConsultingPage authContext={authContext} />;
+      case 'code':
+        return <GitHubCodeAssistantPage authContext={authContext} />;
+      case 'automl':
+        if (!user || !isAuthorized) {
+          return renderAutoMLPreviewPage();
+        }
+        return <AutoMLPage />;
+      case 'docprocessor':
+        return <ScriptRunnerPage />;
+      case 'bpmap':
+        return <GoogleMapsCompetitiveIntel />;
+      case 'dqemap':
+        return (
+          <DQEPasswordGate>
+            <DQEMap />
+          </DQEPasswordGate>
+        );
+      case 'lead':
+        return <LeadsDashboard />;
+      case 'ben':
+        return <FileUploader />;
+      case 'blueprint':
+        return <LandingPage />;
+      default:
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <h1 className="text-2xl text-gray-500">Select a page</h1>
+            </div>
           </div>
-        </div>
-      );
-  }
-};
+        );
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -362,7 +431,7 @@ useEffect(() => {
       <div className="flex flex-1">
         <Sidebar
           activeTab={activeTab}
-          setActiveTab={setActiveTab} // Sidebar now handles its own tracking
+          setActiveTab={setActiveTab}
           user={user}
           isAuthorized={isAuthorized}
         />

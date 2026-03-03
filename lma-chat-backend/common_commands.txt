@@ -9,4 +9,5 @@ gcloud run deploy lma-chat-api \
   --allow-unauthenticated \
   --memory 1Gi \
   --cpu 1 \
-  --max-instances 1
+  --max-instances 1\
+  --set-env-vars "GCP_PROJECT_ID=lma-website-461920,VERTEX_SEARCH_LOCATION=us,VERTEX_AI_LOCATION=us-central1,VERTEX_SEARCH_DATA_STORE_ID=lmagdriveconnector_1763135069075_gcs_store,VERTEX_SEARCH_ENGINE_ID=maraisadvisorydrive_1763134895211"

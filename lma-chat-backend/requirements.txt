@@ -20,6 +20,7 @@ firebase-admin
 # Vertex AI for your existing routers
 vertexai
 google-generativeai
+google-cloud-discoveryengine
 
 # Google GenAI (for unified client)
 google-genai
@@ -36,3 +37,6 @@ huggingface_hub
 
 # Mistral AI dependencies
 mistralai
+
+# Vertex AI Search
+google-api-core

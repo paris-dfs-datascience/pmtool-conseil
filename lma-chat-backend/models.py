@@ -37,7 +37,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """Response model for chat endpoints"""
     response: str = Field(..., description="Generated response text")
-    status: Literal["success", "error"] = Field(..., description="Response status")
+    status: Literal["success", "error", "partial"] = Field(..., description="Response status")
 
 # FILE SUPPORT MODELS - NEW ADDITIONS
 

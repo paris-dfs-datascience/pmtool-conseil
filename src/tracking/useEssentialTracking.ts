@@ -62,7 +62,7 @@ export const useEssentialTracking = () => {
     if (window.gtag && timeSpent > 0) {
       window.gtag('event', 'timing_complete', {
         name: 'time_on_page',
-        value: timeSpent
+        value: 1
       });
 
       window.gtag('event', 'page_engagement', {

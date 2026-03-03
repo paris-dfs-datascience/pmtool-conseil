@@ -1,8 +1,8 @@
 // src/components/Sidebar.tsx
 import React, { useState, useRef } from 'react';
 import { Home, MessageCircle, FerrisWheel, PenTool, Briefcase, Bug, LogIn, Map, LogOut, User, Code, Brain, LayoutList, ScanSearch, ChartScatter, Beaker} from 'lucide-react';
-import { signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../firebase';
 import { useEssentialTracking } from '../tracking'; // Import tracking
 
 interface SidebarProps {
@@ -27,9 +27,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, isAuth
         auth_method: 'google'
       });
       
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Error signing in with Google:', error);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      // Handle specific errors gracefully
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('Sign-in cancelled by user');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        console.log('Another sign-in popup is already open');
+      } else {
+        console.error('Error signing in with Google:', error);
+      }
     }
   };
 

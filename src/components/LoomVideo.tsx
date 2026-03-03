@@ -39,14 +39,14 @@ const LoomVideo: React.FC<LoomVideoProps> = ({
 
   const containerStyle = aspectRatio === 'fixed' 
     ? {
-        width: '90%',
+        width: '100%',
         maxWidth: '960px',
         height: height,
         maxHeight: maxHeight,
         position: 'relative' as const
       }
     : {
-        width: '90%',
+        width: '100%',
         maxWidth: '960px',
         position: 'relative' as const,
         paddingBottom: getAspectRatio(),

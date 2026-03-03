@@ -7,6 +7,7 @@ import InteractiveLMADiagram from '../components/HomePageComponents/ConseilInter
 import DemoSignup from '../components/HomePageComponents/demo';
 import Bio from '../components/HomePageComponents/bio';
 import ConsultingOverview from '../components/HomePageComponents/summary';
+import PEConsulting from '../components/HomePageComponents/PEConsulting';
 import { useEssentialTracking } from '../tracking'; // Import tracking
 
 interface User {
@@ -83,6 +84,7 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
        <div data-section="consulting_section">
         <ConsultingSection />
       </div>
+
       
       {/* Video Section with tracking */}
       <div data-section="video">
@@ -90,6 +92,11 @@ const HomePage: React.FC<HomePageProps> = ({ user, isAuthorized }) => {
           videoId="e274be04259b42ef8452371eb0855f44"
           sid="5037f673-4432-46a1-a736-7edf71ca9053"
         />
+      </div>
+
+      <div className="h-12"></div>
+       <div data-section="consulting_section">
+        <PEConsulting />
       </div>
 
       <div className="h-12"></div>
