@@ -1,6 +1,6 @@
 // src/components/project-tracker/project-tracker.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Users, Briefcase, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Users, Briefcase, TrendingUp, ArrowRightToLine } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 
@@ -14,15 +14,14 @@ interface Employee {
 interface Assignment {
   id: string;
   employeeId: string;
-  allocation: number;
-  months: number;
+  monthlyAllocation: number[];
 }
 
 interface Project {
   id: string;
   name: string;
   months: number;
-  monthlyRevenue: number;
+  monthlyRevenue: number[];
   assignments: Assignment[];
 }
 
@@ -42,9 +41,68 @@ const newId = () =>
 
 const emptyStore = (): Store => ({ employees: [], projects: [] });
 
+const fitArray = (arr: any, length: number, fill = 0): number[] => {
+  const safe = Array.isArray(arr)
+    ? arr.map(v => (Number.isFinite(Number(v)) ? Number(v) : fill))
+    : [];
+  if (safe.length >= length) return safe.slice(0, length);
+  return [...safe, ...Array(length - safe.length).fill(fill)];
+};
+
+const migrateProject = (raw: any): Project => {
+  const months = Math.max(0, Math.floor(Number(raw?.months) || 0));
+
+  let monthlyRevenue: number[];
+  if (Array.isArray(raw?.monthlyRevenue)) {
+    monthlyRevenue = fitArray(raw.monthlyRevenue, months);
+  } else if (Number.isFinite(Number(raw?.monthlyRevenue))) {
+    monthlyRevenue = Array(months).fill(Number(raw.monthlyRevenue));
+  } else {
+    monthlyRevenue = Array(months).fill(0);
+  }
+
+  const assignments: Assignment[] = (
+    Array.isArray(raw?.assignments) ? raw.assignments : []
+  ).map((a: any) => {
+    let monthlyAllocation: number[];
+    if (Array.isArray(a?.monthlyAllocation)) {
+      monthlyAllocation = fitArray(a.monthlyAllocation, months);
+    } else if (Number.isFinite(Number(a?.allocation))) {
+      const allocMonths = Math.max(
+        0,
+        Math.min(months, Math.floor(Number(a?.months) || months)),
+      );
+      monthlyAllocation = Array(months).fill(0);
+      for (let i = 0; i < allocMonths; i++) monthlyAllocation[i] = Number(a.allocation);
+    } else {
+      monthlyAllocation = Array(months).fill(0);
+    }
+    return {
+      id: a?.id || newId(),
+      employeeId: a?.employeeId || '',
+      monthlyAllocation,
+    };
+  });
+
+  return {
+    id: raw?.id || newId(),
+    name: raw?.name || '',
+    months,
+    monthlyRevenue,
+    assignments,
+  };
+};
+
 const sanitizeStore = (raw: any): Store => ({
-  employees: Array.isArray(raw?.employees) ? raw.employees : [],
-  projects: Array.isArray(raw?.projects) ? raw.projects : [],
+  employees: Array.isArray(raw?.employees)
+    ? raw.employees.map((e: any) => ({
+        id: e?.id || newId(),
+        name: e?.name || '',
+        baseSalary: Number(e?.baseSalary) || 0,
+        overheadMultiple: Number(e?.overheadMultiple) || 0,
+      }))
+    : [],
+  projects: Array.isArray(raw?.projects) ? raw.projects.map(migrateProject) : [],
 });
 
 const fmtCurrency = (n: number) =>
@@ -54,19 +112,25 @@ const fmtCurrency = (n: number) =>
     maximumFractionDigits: 0,
   }).format(isFinite(n) ? n : 0);
 
-const fmtPct = (n: number) =>
-  isFinite(n) ? `${(n * 100).toFixed(1)}%` : '—';
+const fmtPct = (n: number) => (isFinite(n) ? `${(n * 100).toFixed(1)}%` : '—');
 
 const monthlyCost = (e: Employee) => (e.baseSalary * e.overheadMultiple) / 12;
 
-const projectRevenue = (p: Project) => p.months * p.monthlyRevenue;
-
-const projectCost = (p: Project, employees: Employee[]) =>
-  p.assignments.reduce((sum, a) => {
+const monthCost = (p: Project, monthIdx: number, employees: Employee[]) =>
+  p.assignments.reduce((s, a) => {
     const emp = employees.find(e => e.id === a.employeeId);
-    if (!emp) return sum;
-    return sum + monthlyCost(emp) * a.allocation * a.months;
+    if (!emp) return s;
+    return s + monthlyCost(emp) * (a.monthlyAllocation[monthIdx] ?? 0);
   }, 0);
+
+const projectRevenue = (p: Project) =>
+  p.monthlyRevenue.reduce((s, r) => s + (Number(r) || 0), 0);
+
+const projectCost = (p: Project, employees: Employee[]) => {
+  let total = 0;
+  for (let i = 0; i < p.months; i++) total += monthCost(p, i, employees);
+  return total;
+};
 
 export default function ProjectTracker() {
   const [store, setStore] = useState<Store>(emptyStore);
@@ -154,7 +218,8 @@ export default function ProjectTracker() {
       })),
     }));
 
-  const addProject = () =>
+  const addProject = () => {
+    const months = 6;
     setStore(s => ({
       ...s,
       projects: [
@@ -162,21 +227,63 @@ export default function ProjectTracker() {
         {
           id: newId(),
           name: '',
-          months: 6,
-          monthlyRevenue: 0,
+          months,
+          monthlyRevenue: Array(months).fill(0),
           assignments: [],
         },
       ],
     }));
+  };
 
-  const updateProject = (id: string, patch: Partial<Project>) =>
+  const updateProjectFields = (id: string, patch: Partial<Pick<Project, 'name'>>) =>
     setStore(s => ({
       ...s,
       projects: s.projects.map(p => (p.id === id ? { ...p, ...patch } : p)),
     }));
 
+  const setProjectMonths = (id: string, rawMonths: number) => {
+    const months = Math.max(0, Math.floor(rawMonths));
+    setStore(s => ({
+      ...s,
+      projects: s.projects.map(p =>
+        p.id !== id
+          ? p
+          : {
+              ...p,
+              months,
+              monthlyRevenue: fitArray(p.monthlyRevenue, months),
+              assignments: p.assignments.map(a => ({
+                ...a,
+                monthlyAllocation: fitArray(a.monthlyAllocation, months),
+              })),
+            },
+      ),
+    }));
+  };
+
   const removeProject = (id: string) =>
     setStore(s => ({ ...s, projects: s.projects.filter(p => p.id !== id) }));
+
+  const setMonthlyRevenue = (projectId: string, monthIdx: number, value: number) =>
+    setStore(s => ({
+      ...s,
+      projects: s.projects.map(p => {
+        if (p.id !== projectId) return p;
+        const next = [...p.monthlyRevenue];
+        next[monthIdx] = value;
+        return { ...p, monthlyRevenue: next };
+      }),
+    }));
+
+  const fillMonthlyRevenue = (projectId: string) =>
+    setStore(s => ({
+      ...s,
+      projects: s.projects.map(p => {
+        if (p.id !== projectId) return p;
+        const v = p.monthlyRevenue[0] ?? 0;
+        return { ...p, monthlyRevenue: Array(p.months).fill(v) };
+      }),
+    }));
 
   const addAssignment = (projectId: string) =>
     setStore(s => ({
@@ -191,18 +298,17 @@ export default function ProjectTracker() {
             {
               id: newId(),
               employeeId: firstEmp ? firstEmp.id : '',
-              allocation: 1,
-              months: p.months,
+              monthlyAllocation: Array(p.months).fill(1),
             },
           ],
         };
       }),
     }));
 
-  const updateAssignment = (
+  const setAssignmentEmployee = (
     projectId: string,
     assignmentId: string,
-    patch: Partial<Assignment>,
+    employeeId: string,
   ) =>
     setStore(s => ({
       ...s,
@@ -212,10 +318,48 @@ export default function ProjectTracker() {
           : {
               ...p,
               assignments: p.assignments.map(a =>
-                a.id === assignmentId ? { ...a, ...patch } : a,
+                a.id === assignmentId ? { ...a, employeeId } : a,
               ),
             },
       ),
+    }));
+
+  const setMonthlyAllocation = (
+    projectId: string,
+    assignmentId: string,
+    monthIdx: number,
+    value: number,
+  ) =>
+    setStore(s => ({
+      ...s,
+      projects: s.projects.map(p => {
+        if (p.id !== projectId) return p;
+        return {
+          ...p,
+          assignments: p.assignments.map(a => {
+            if (a.id !== assignmentId) return a;
+            const next = [...a.monthlyAllocation];
+            next[monthIdx] = Math.max(0, Math.min(1, value));
+            return { ...a, monthlyAllocation: next };
+          }),
+        };
+      }),
+    }));
+
+  const fillMonthlyAllocation = (projectId: string, assignmentId: string) =>
+    setStore(s => ({
+      ...s,
+      projects: s.projects.map(p => {
+        if (p.id !== projectId) return p;
+        return {
+          ...p,
+          assignments: p.assignments.map(a => {
+            if (a.id !== assignmentId) return a;
+            const v = a.monthlyAllocation[0] ?? 0;
+            return { ...a, monthlyAllocation: Array(p.months).fill(v) };
+          }),
+        };
+      }),
     }));
 
   const removeAssignment = (projectId: string, assignmentId: string) =>
@@ -261,9 +405,7 @@ export default function ProjectTracker() {
               Track project profitability based on employee fully-loaded costs.
             </p>
           </div>
-          {saveLabel && (
-            <span className={`text-xs ${saveColor}`}>{saveLabel}</span>
-          )}
+          {saveLabel && <span className={`text-xs ${saveColor}`}>{saveLabel}</span>}
         </div>
 
         {/* Rollup */}
@@ -304,7 +446,9 @@ export default function ProjectTracker() {
           </div>
 
           {employees.length === 0 ? (
-            <p className="text-sm text-gray-500">No employees yet. Add one to get started.</p>
+            <p className="text-sm text-gray-500">
+              No employees yet. Add one to get started.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -327,7 +471,9 @@ export default function ProjectTracker() {
                           <input
                             type="text"
                             value={e.name}
-                            onChange={ev => updateEmployee(e.id, { name: ev.target.value })}
+                            onChange={ev =>
+                              updateEmployee(e.id, { name: ev.target.value })
+                            }
                             placeholder="Employee name"
                             className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200"
                           />
@@ -342,12 +488,18 @@ export default function ProjectTracker() {
                         <td className="py-2 pr-4">
                           <NumberInput
                             value={e.overheadMultiple}
-                            onChange={v => updateEmployee(e.id, { overheadMultiple: v })}
+                            onChange={v =>
+                              updateEmployee(e.id, { overheadMultiple: v })
+                            }
                             step={0.1}
                           />
                         </td>
-                        <td className="py-2 pr-4 text-gray-700">{fmtCurrency(loaded)}</td>
-                        <td className="py-2 pr-4 text-gray-700">{fmtCurrency(monthlyCost(e))}</td>
+                        <td className="py-2 pr-4 text-gray-700">
+                          {fmtCurrency(loaded)}
+                        </td>
+                        <td className="py-2 pr-4 text-gray-700">
+                          {fmtCurrency(monthlyCost(e))}
+                        </td>
                         <td className="py-2 pr-2 text-right">
                           <button
                             onClick={() => removeEmployee(e.id)}
@@ -383,7 +535,9 @@ export default function ProjectTracker() {
 
           {projects.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <p className="text-sm text-gray-500">No projects yet. Add one to get started.</p>
+              <p className="text-sm text-gray-500">
+                No projects yet. Add one to get started.
+              </p>
             </div>
           ) : (
             projects.map(p => (
@@ -391,10 +545,19 @@ export default function ProjectTracker() {
                 key={p.id}
                 project={p}
                 employees={employees}
-                onUpdate={patch => updateProject(p.id, patch)}
+                onUpdateFields={patch => updateProjectFields(p.id, patch)}
+                onSetMonths={m => setProjectMonths(p.id, m)}
                 onRemove={() => removeProject(p.id)}
+                onSetMonthlyRevenue={(i, v) => setMonthlyRevenue(p.id, i, v)}
+                onFillMonthlyRevenue={() => fillMonthlyRevenue(p.id)}
                 onAddAssignment={() => addAssignment(p.id)}
-                onUpdateAssignment={(aid, patch) => updateAssignment(p.id, aid, patch)}
+                onSetAssignmentEmployee={(aid, eid) =>
+                  setAssignmentEmployee(p.id, aid, eid)
+                }
+                onSetMonthlyAllocation={(aid, i, v) =>
+                  setMonthlyAllocation(p.id, aid, i, v)
+                }
+                onFillMonthlyAllocation={aid => fillMonthlyAllocation(p.id, aid)}
                 onRemoveAssignment={aid => removeAssignment(p.id, aid)}
               />
             ))
@@ -456,27 +619,65 @@ function NumberInput({
   );
 }
 
+function CellInput({
+  value,
+  onChange,
+  step,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+}) {
+  return (
+    <input
+      type="number"
+      value={Number.isFinite(value) ? value : 0}
+      step={step ?? 1}
+      onChange={ev => {
+        const n = parseFloat(ev.target.value);
+        onChange(Number.isFinite(n) ? n : 0);
+      }}
+      className="w-20 border border-gray-200 rounded px-1 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-200"
+    />
+  );
+}
+
 function ProjectCard({
   project,
   employees,
-  onUpdate,
+  onUpdateFields,
+  onSetMonths,
   onRemove,
+  onSetMonthlyRevenue,
+  onFillMonthlyRevenue,
   onAddAssignment,
-  onUpdateAssignment,
+  onSetAssignmentEmployee,
+  onSetMonthlyAllocation,
+  onFillMonthlyAllocation,
   onRemoveAssignment,
 }: {
   project: Project;
   employees: Employee[];
-  onUpdate: (patch: Partial<Project>) => void;
+  onUpdateFields: (patch: Partial<Pick<Project, 'name'>>) => void;
+  onSetMonths: (months: number) => void;
   onRemove: () => void;
+  onSetMonthlyRevenue: (monthIdx: number, value: number) => void;
+  onFillMonthlyRevenue: () => void;
   onAddAssignment: () => void;
-  onUpdateAssignment: (assignmentId: string, patch: Partial<Assignment>) => void;
+  onSetAssignmentEmployee: (assignmentId: string, employeeId: string) => void;
+  onSetMonthlyAllocation: (
+    assignmentId: string,
+    monthIdx: number,
+    value: number,
+  ) => void;
+  onFillMonthlyAllocation: (assignmentId: string) => void;
   onRemoveAssignment: (assignmentId: string) => void;
 }) {
   const revenue = projectRevenue(project);
   const cost = projectCost(project, employees);
   const profit = revenue - cost;
   const margin = revenue > 0 ? profit / revenue : 0;
+  const monthIndices = Array.from({ length: project.months }, (_, i) => i);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -489,7 +690,7 @@ function ProjectCard({
             <input
               type="text"
               value={project.name}
-              onChange={e => onUpdate({ name: e.target.value })}
+              onChange={e => onUpdateFields({ name: e.target.value })}
               placeholder="Project name"
               className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
@@ -498,20 +699,7 @@ function ProjectCard({
             <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1">
               Months
             </label>
-            <NumberInput
-              value={project.months}
-              onChange={v => onUpdate({ months: Math.max(0, v) })}
-            />
-          </div>
-          <div className="w-44">
-            <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1">
-              Monthly Revenue
-            </label>
-            <NumberInput
-              value={project.monthlyRevenue}
-              onChange={v => onUpdate({ monthlyRevenue: v })}
-              prefix="$"
-            />
+            <NumberInput value={project.months} onChange={v => onSetMonths(v)} />
           </div>
         </div>
         <button
@@ -539,7 +727,7 @@ function ProjectCard({
       </div>
 
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-700">Assigned Employees</h3>
+        <h3 className="text-sm font-medium text-gray-700">Month-by-Month Breakdown</h3>
         <button
           onClick={onAddAssignment}
           disabled={employees.length === 0}
@@ -549,82 +737,180 @@ function ProjectCard({
         </button>
       </div>
 
-      {project.assignments.length === 0 ? (
-        <p className="text-xs text-gray-500">
-          {employees.length === 0
-            ? 'Add an employee in the Employees section first.'
-            : 'No employees assigned to this project yet.'}
-        </p>
+      {project.months === 0 ? (
+        <p className="text-xs text-gray-500">Set the project length (in months) above.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="text-sm border-collapse">
             <thead>
-              <tr className="text-left text-gray-500 border-b border-gray-200">
-                <th className="py-1.5 pr-4 font-medium">Employee</th>
-                <th className="py-1.5 pr-4 font-medium">Allocation</th>
-                <th className="py-1.5 pr-4 font-medium">Months</th>
-                <th className="py-1.5 pr-4 font-medium">Cost</th>
-                <th className="py-1.5 pr-2 font-medium text-right">—</th>
+              <tr className="text-gray-500 border-b border-gray-200">
+                <th className="text-left py-1.5 pr-3 font-medium w-48">Row</th>
+                <th className="px-1 py-1.5 font-medium w-8"></th>
+                {monthIndices.map(i => (
+                  <th
+                    key={i}
+                    className="px-1 py-1.5 font-medium text-center text-xs"
+                  >
+                    M{i + 1}
+                  </th>
+                ))}
+                <th className="px-2 py-1.5 font-medium text-right text-xs">Total</th>
               </tr>
             </thead>
             <tbody>
+              <tr className="border-b border-gray-100">
+                <td className="pr-3 py-1 text-gray-700 font-medium">Revenue</td>
+                <td className="px-1 py-1">
+                  <button
+                    onClick={onFillMonthlyRevenue}
+                    title="Fill all months with M1 value"
+                    className="text-gray-400 hover:text-blue-500"
+                  >
+                    <ArrowRightToLine size={14} />
+                  </button>
+                </td>
+                {monthIndices.map(i => (
+                  <td key={i} className="px-1 py-1">
+                    <CellInput
+                      value={project.monthlyRevenue[i] ?? 0}
+                      onChange={v => onSetMonthlyRevenue(i, v)}
+                    />
+                  </td>
+                ))}
+                <td className="px-2 py-1 text-right text-gray-700">
+                  {fmtCurrency(revenue)}
+                </td>
+              </tr>
+
               {project.assignments.map(a => {
                 const emp = employees.find(e => e.id === a.employeeId);
-                const aCost = emp ? monthlyCost(emp) * a.allocation * a.months : 0;
+                const aTotalCost = emp
+                  ? a.monthlyAllocation.reduce(
+                      (s, alloc) => s + monthlyCost(emp) * (alloc || 0),
+                      0,
+                    )
+                  : 0;
                 return (
                   <tr key={a.id} className="border-b border-gray-100">
-                    <td className="py-1.5 pr-4">
-                      <select
-                        value={a.employeeId}
-                        onChange={ev =>
-                          onUpdateAssignment(a.id, { employeeId: ev.target.value })
-                        }
-                        className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                      >
-                        <option value="">— Select employee —</option>
-                        {employees.map(e => (
-                          <option key={e.id} value={e.id}>
-                            {e.name || '(unnamed)'}
-                          </option>
-                        ))}
-                      </select>
+                    <td className="pr-3 py-1">
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={a.employeeId}
+                          onChange={ev =>
+                            onSetAssignmentEmployee(a.id, ev.target.value)
+                          }
+                          className="flex-1 min-w-0 border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-200"
+                        >
+                          <option value="">— Select —</option>
+                          {employees.map(e => (
+                            <option key={e.id} value={e.id}>
+                              {e.name || '(unnamed)'}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => onRemoveAssignment(a.id)}
+                          className="text-gray-400 hover:text-red-500"
+                          title="Remove assignment"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
-                    <td className="py-1.5 pr-4 w-32">
-                      <NumberInput
-                        value={a.allocation}
-                        onChange={v =>
-                          onUpdateAssignment(a.id, {
-                            allocation: Math.max(0, Math.min(1, v)),
-                          })
-                        }
-                        step={0.05}
-                      />
-                    </td>
-                    <td className="py-1.5 pr-4 w-24">
-                      <NumberInput
-                        value={a.months}
-                        onChange={v =>
-                          onUpdateAssignment(a.id, { months: Math.max(0, v) })
-                        }
-                      />
-                    </td>
-                    <td className="py-1.5 pr-4 text-gray-700">{fmtCurrency(aCost)}</td>
-                    <td className="py-1.5 pr-2 text-right">
+                    <td className="px-1 py-1">
                       <button
-                        onClick={() => onRemoveAssignment(a.id)}
-                        className="text-gray-400 hover:text-red-500"
-                        title="Remove assignment"
+                        onClick={() => onFillMonthlyAllocation(a.id)}
+                        title="Fill all months with M1 value"
+                        className="text-gray-400 hover:text-blue-500"
                       >
-                        <Trash2 size={16} />
+                        <ArrowRightToLine size={14} />
                       </button>
+                    </td>
+                    {monthIndices.map(i => (
+                      <td key={i} className="px-1 py-1">
+                        <CellInput
+                          value={a.monthlyAllocation[i] ?? 0}
+                          step={0.05}
+                          onChange={v => onSetMonthlyAllocation(a.id, i, v)}
+                        />
+                      </td>
+                    ))}
+                    <td className="px-2 py-1 text-right text-gray-700">
+                      {fmtCurrency(aTotalCost)}
                     </td>
                   </tr>
                 );
               })}
+
+              <tr className="border-t-2 border-gray-200 text-xs">
+                <td className="pr-3 py-1 text-gray-500">Cost</td>
+                <td></td>
+                {monthIndices.map(i => (
+                  <td key={i} className="px-1 py-1 text-gray-700 text-right">
+                    {fmtCurrency(monthCost(project, i, employees))}
+                  </td>
+                ))}
+                <td className="px-2 py-1 text-right text-gray-700">
+                  {fmtCurrency(cost)}
+                </td>
+              </tr>
+              <tr className="text-xs">
+                <td className="pr-3 py-1 text-gray-500">Profit</td>
+                <td></td>
+                {monthIndices.map(i => {
+                  const r = project.monthlyRevenue[i] ?? 0;
+                  const c = monthCost(project, i, employees);
+                  const v = r - c;
+                  return (
+                    <td
+                      key={i}
+                      className={`px-1 py-1 text-right ${
+                        v >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {fmtCurrency(v)}
+                    </td>
+                  );
+                })}
+                <td
+                  className={`px-2 py-1 text-right ${
+                    profit >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {fmtCurrency(profit)}
+                </td>
+              </tr>
+              <tr className="text-xs">
+                <td className="pr-3 py-1 text-gray-500">Margin</td>
+                <td></td>
+                {monthIndices.map(i => {
+                  const r = project.monthlyRevenue[i] ?? 0;
+                  const c = monthCost(project, i, employees);
+                  const m = r > 0 ? (r - c) / r : 0;
+                  return (
+                    <td
+                      key={i}
+                      className={`px-1 py-1 text-right ${
+                        m >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {fmtPct(m)}
+                    </td>
+                  );
+                })}
+                <td
+                  className={`px-2 py-1 text-right ${
+                    margin >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {fmtPct(margin)}
+                </td>
+              </tr>
             </tbody>
           </table>
           <p className="text-xs text-gray-400 mt-2">
-            Allocation is a fraction of full-time (e.g. 0.5 = half-time, 1 = full-time).
+            Allocation per month is a fraction of full-time (0.5 = half-time, 1 =
+            full-time). Use the arrow icon to copy M1's value across all months.
           </p>
         </div>
       )}
