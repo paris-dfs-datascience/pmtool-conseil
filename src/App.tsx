@@ -25,6 +25,8 @@ import DQEMap from './components/dqe-maps/dqe-map'
 import LeadsDashboard from './components/LMA_Leads/LMA_Leads';
 import FileUploader from './components/ben_upload'
 import DQEPasswordGate from './components/dqe-maps/dqepassword';
+import ProjectTracker from './components/project-tracker/project-tracker';
+import ProjectPasswordGate from './components/project-tracker/projectpassword';
 
 interface User {
   displayName?: string | null;
@@ -114,7 +116,11 @@ function App() {
         setActiveTab('ben');
         return;
       }
-      
+      if (page === 'projects') {
+        setActiveTab('projects');
+        return;
+      }
+
       // Check hash routing as backup
       const hash = window.location.hash.replace('#', '');
       if (hash === 'docprocessor') {
@@ -141,7 +147,11 @@ function App() {
         setActiveTab('ben');
         return;
       }
-      
+      if (hash === 'projects') {
+        setActiveTab('projects');
+        return;
+      }
+
       // Check direct path (if you're using something like /docprocessor)
       const path = window.location.pathname.replace('/', '');
       if (path === 'docprocessor') {
@@ -166,6 +176,10 @@ function App() {
       }
       if (path === 'ben') {
         setActiveTab('ben');
+        return;
+      }
+      if (path === 'projects') {
+        setActiveTab('projects');
         return;
       }
     };
@@ -379,6 +393,12 @@ function App() {
         return <LeadsDashboard />;
       case 'ben':
         return <FileUploader />;
+      case 'projects':
+        return (
+          <ProjectPasswordGate>
+            <ProjectTracker />
+          </ProjectPasswordGate>
+        );
       case 'blueprint':
         return <LandingPage />;
       default:
