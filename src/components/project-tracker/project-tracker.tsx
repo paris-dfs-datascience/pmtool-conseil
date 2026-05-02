@@ -187,12 +187,10 @@ const empMonthUtilization = (
   monthIdx: number,
   projects: Project[],
 ) =>
-  projects
-    .filter(p => p.status === 'active')
-    .reduce((s, p) => {
-      const a = p.assignments.find(x => x.employeeId === empId);
-      return a ? s + (a.monthlyAllocation[monthIdx] ?? 0) : s;
-    }, 0);
+  projects.reduce((s, p) => {
+    const a = p.assignments.find(x => x.employeeId === empId);
+    return a ? s + (a.monthlyAllocation[monthIdx] ?? 0) : s;
+  }, 0);
 
 const utilizationTone = (u: number): 'positive' | 'negative' | 'neutral' => {
   if (u > 1.0) return 'negative';
@@ -262,9 +260,8 @@ export default function ProjectTracker() {
   }, [projects]);
 
   const rollup = useMemo(() => {
-    const active = projects.filter(p => p.status === 'active');
-    const revenue = active.reduce((s, p) => s + projectRevenue(p), 0);
-    const cost = active.reduce((s, p) => s + projectCost(p, employees), 0);
+    const revenue = projects.reduce((s, p) => s + projectRevenue(p), 0);
+    const cost = projects.reduce((s, p) => s + projectCost(p, employees), 0);
     const profit = revenue - cost;
     const margin = revenue > 0 ? profit / revenue : 0;
     return { revenue, cost, profit, margin };
@@ -512,7 +509,9 @@ export default function ProjectTracker() {
           <div className="flex items-center mb-4">
             <TrendingUp size={20} className="text-blue-600 mr-2" />
             <h2 className="text-lg font-semibold text-gray-800">Portfolio Rollup</h2>
-            <span className="ml-2 text-xs text-gray-400">(active projects only)</span>
+            <span className="ml-2 text-xs text-gray-400">
+              (all projects, active + retired)
+            </span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat label="Total Revenue" value={fmtCurrency(rollup.revenue)} />
@@ -574,7 +573,7 @@ export default function ProjectTracker() {
                 <tbody>
                   {employees.map(e => (
                     <tr key={e.id} className="border-b border-gray-100">
-                      <td className="pr-3 py-1">
+                      <td className="pr-3 py-1" style={{ minWidth: 180 }}>
                         <input
                           type="text"
                           value={e.name}
@@ -582,7 +581,8 @@ export default function ProjectTracker() {
                             updateEmployeeFields(e.id, { name: ev.target.value })
                           }
                           placeholder="Name"
-                          className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                          style={{ width: 180 }}
+                          className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
                         />
                       </td>
                       <td className="pr-3 py-1">
@@ -645,11 +645,11 @@ export default function ProjectTracker() {
                 Employee Utilization
               </h2>
               <span className="ml-2 text-xs text-gray-400">
-                (sum of allocations across active projects)
+                (sum of allocations across all projects)
               </span>
             </div>
             <div className="overflow-x-auto">
-              <table className="text-sm border-collapse">
+              <table className="w-full text-sm border-collapse table-fixed">
                 <thead>
                   <tr className="text-gray-500 border-b border-gray-200">
                     <th className="text-left py-1.5 pr-3 font-medium w-44">
@@ -668,7 +668,7 @@ export default function ProjectTracker() {
                 <tbody>
                   {employees.map(e => (
                     <tr key={e.id} className="border-b border-gray-100">
-                      <td className="pr-3 py-1.5 text-gray-700">
+                      <td className="pr-3 py-1.5 text-gray-700 truncate">
                         {e.name || '(unnamed)'}
                       </td>
                       {MONTH_LABELS.map((_, i) => {
