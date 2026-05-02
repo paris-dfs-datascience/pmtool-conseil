@@ -1,13 +1,40 @@
 // src/components/project-tracker/project-tracker.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Users, Briefcase, TrendingUp, ArrowRightToLine } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Users,
+  Briefcase,
+  TrendingUp,
+  ArrowRightToLine,
+  Archive,
+  ArchiveRestore,
+  Activity,
+} from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
+
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+const MONTHS_COUNT = MONTH_LABELS.length;
+const YEAR_LABEL = '2026';
 
 interface Employee {
   id: string;
   name: string;
-  baseSalary: number;
+  monthlySalary: number[];
   overheadMultiple: number;
 }
 
@@ -17,10 +44,12 @@ interface Assignment {
   monthlyAllocation: number[];
 }
 
+type ProjectStatus = 'active' | 'retired';
+
 interface Project {
   id: string;
   name: string;
-  months: number;
+  status: ProjectStatus;
   monthlyRevenue: number[];
   assignments: Assignment[];
 }
@@ -49,16 +78,34 @@ const fitArray = (arr: any, length: number, fill = 0): number[] => {
   return [...safe, ...Array(length - safe.length).fill(fill)];
 };
 
-const migrateProject = (raw: any): Project => {
-  const months = Math.max(0, Math.floor(Number(raw?.months) || 0));
+const migrateEmployee = (raw: any): Employee => {
+  let monthlySalary: number[];
+  if (Array.isArray(raw?.monthlySalary)) {
+    monthlySalary = fitArray(raw.monthlySalary, MONTHS_COUNT);
+  } else if (Number.isFinite(Number(raw?.baseSalary))) {
+    monthlySalary = Array(MONTHS_COUNT).fill(Number(raw.baseSalary) / 12);
+  } else {
+    monthlySalary = Array(MONTHS_COUNT).fill(0);
+  }
+  const overheadMultiple = Number.isFinite(Number(raw?.overheadMultiple))
+    ? Number(raw.overheadMultiple)
+    : 1.5;
+  return {
+    id: raw?.id || newId(),
+    name: raw?.name || '',
+    monthlySalary,
+    overheadMultiple,
+  };
+};
 
+const migrateProject = (raw: any): Project => {
   let monthlyRevenue: number[];
   if (Array.isArray(raw?.monthlyRevenue)) {
-    monthlyRevenue = fitArray(raw.monthlyRevenue, months);
+    monthlyRevenue = fitArray(raw.monthlyRevenue, MONTHS_COUNT);
   } else if (Number.isFinite(Number(raw?.monthlyRevenue))) {
-    monthlyRevenue = Array(months).fill(Number(raw.monthlyRevenue));
+    monthlyRevenue = Array(MONTHS_COUNT).fill(Number(raw.monthlyRevenue));
   } else {
-    monthlyRevenue = Array(months).fill(0);
+    monthlyRevenue = Array(MONTHS_COUNT).fill(0);
   }
 
   const assignments: Assignment[] = (
@@ -66,16 +113,17 @@ const migrateProject = (raw: any): Project => {
   ).map((a: any) => {
     let monthlyAllocation: number[];
     if (Array.isArray(a?.monthlyAllocation)) {
-      monthlyAllocation = fitArray(a.monthlyAllocation, months);
+      monthlyAllocation = fitArray(a.monthlyAllocation, MONTHS_COUNT);
     } else if (Number.isFinite(Number(a?.allocation))) {
-      const allocMonths = Math.max(
+      const oldMonths = Math.max(
         0,
-        Math.min(months, Math.floor(Number(a?.months) || months)),
+        Math.min(MONTHS_COUNT, Math.floor(Number(a?.months) || 0)),
       );
-      monthlyAllocation = Array(months).fill(0);
-      for (let i = 0; i < allocMonths; i++) monthlyAllocation[i] = Number(a.allocation);
+      monthlyAllocation = Array(MONTHS_COUNT).fill(0);
+      for (let i = 0; i < oldMonths; i++)
+        monthlyAllocation[i] = Number(a.allocation);
     } else {
-      monthlyAllocation = Array(months).fill(0);
+      monthlyAllocation = Array(MONTHS_COUNT).fill(0);
     }
     return {
       id: a?.id || newId(),
@@ -87,21 +135,14 @@ const migrateProject = (raw: any): Project => {
   return {
     id: raw?.id || newId(),
     name: raw?.name || '',
-    months,
+    status: raw?.status === 'retired' ? 'retired' : 'active',
     monthlyRevenue,
     assignments,
   };
 };
 
 const sanitizeStore = (raw: any): Store => ({
-  employees: Array.isArray(raw?.employees)
-    ? raw.employees.map((e: any) => ({
-        id: e?.id || newId(),
-        name: e?.name || '',
-        baseSalary: Number(e?.baseSalary) || 0,
-        overheadMultiple: Number(e?.overheadMultiple) || 0,
-      }))
-    : [],
+  employees: Array.isArray(raw?.employees) ? raw.employees.map(migrateEmployee) : [],
   projects: Array.isArray(raw?.projects) ? raw.projects.map(migrateProject) : [],
 });
 
@@ -113,14 +154,22 @@ const fmtCurrency = (n: number) =>
   }).format(isFinite(n) ? n : 0);
 
 const fmtPct = (n: number) => (isFinite(n) ? `${(n * 100).toFixed(1)}%` : '—');
+const fmtUtil = (n: number) => (isFinite(n) ? `${Math.round(n * 100)}%` : '—');
 
-const monthlyCost = (e: Employee) => (e.baseSalary * e.overheadMultiple) / 12;
+const empMonthCost = (e: Employee, monthIdx: number) =>
+  (e.monthlySalary[monthIdx] ?? 0) * (e.overheadMultiple ?? 1);
 
-const monthCost = (p: Project, monthIdx: number, employees: Employee[]) =>
+const empTotalCost = (e: Employee) => {
+  let total = 0;
+  for (let i = 0; i < MONTHS_COUNT; i++) total += empMonthCost(e, i);
+  return total;
+};
+
+const projectMonthCost = (p: Project, monthIdx: number, employees: Employee[]) =>
   p.assignments.reduce((s, a) => {
     const emp = employees.find(e => e.id === a.employeeId);
     if (!emp) return s;
-    return s + monthlyCost(emp) * (a.monthlyAllocation[monthIdx] ?? 0);
+    return s + empMonthCost(emp, monthIdx) * (a.monthlyAllocation[monthIdx] ?? 0);
   }, 0);
 
 const projectRevenue = (p: Project) =>
@@ -128,8 +177,27 @@ const projectRevenue = (p: Project) =>
 
 const projectCost = (p: Project, employees: Employee[]) => {
   let total = 0;
-  for (let i = 0; i < p.months; i++) total += monthCost(p, i, employees);
+  for (let i = 0; i < MONTHS_COUNT; i++)
+    total += projectMonthCost(p, i, employees);
   return total;
+};
+
+const empMonthUtilization = (
+  empId: string,
+  monthIdx: number,
+  projects: Project[],
+) =>
+  projects
+    .filter(p => p.status === 'active')
+    .reduce((s, p) => {
+      const a = p.assignments.find(x => x.employeeId === empId);
+      return a ? s + (a.monthlyAllocation[monthIdx] ?? 0) : s;
+    }, 0);
+
+const utilizationTone = (u: number): 'positive' | 'negative' | 'neutral' => {
+  if (u > 1.0) return 'negative';
+  if (u >= 0.8) return 'positive';
+  return 'neutral';
 };
 
 export default function ProjectTracker() {
@@ -186,9 +254,17 @@ export default function ProjectTracker() {
 
   const { employees, projects } = store;
 
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      if (a.status === b.status) return 0;
+      return a.status === 'active' ? -1 : 1;
+    });
+  }, [projects]);
+
   const rollup = useMemo(() => {
-    const revenue = projects.reduce((s, p) => s + projectRevenue(p), 0);
-    const cost = projects.reduce((s, p) => s + projectCost(p, employees), 0);
+    const active = projects.filter(p => p.status === 'active');
+    const revenue = active.reduce((s, p) => s + projectRevenue(p), 0);
+    const cost = active.reduce((s, p) => s + projectCost(p, employees), 0);
     const profit = revenue - cost;
     const margin = revenue > 0 ? profit / revenue : 0;
     return { revenue, cost, profit, margin };
@@ -199,14 +275,47 @@ export default function ProjectTracker() {
       ...s,
       employees: [
         ...s.employees,
-        { id: newId(), name: '', baseSalary: 0, overheadMultiple: 1.5 },
+        {
+          id: newId(),
+          name: '',
+          monthlySalary: Array(MONTHS_COUNT).fill(0),
+          overheadMultiple: 1.5,
+        },
       ],
     }));
 
-  const updateEmployee = (id: string, patch: Partial<Employee>) =>
+  const updateEmployeeFields = (
+    id: string,
+    patch: Partial<Pick<Employee, 'name' | 'overheadMultiple'>>,
+  ) =>
     setStore(s => ({
       ...s,
       employees: s.employees.map(e => (e.id === id ? { ...e, ...patch } : e)),
+    }));
+
+  const setEmployeeMonthlySalary = (
+    id: string,
+    monthIdx: number,
+    value: number,
+  ) =>
+    setStore(s => ({
+      ...s,
+      employees: s.employees.map(e => {
+        if (e.id !== id) return e;
+        const next = [...e.monthlySalary];
+        next[monthIdx] = value;
+        return { ...e, monthlySalary: next };
+      }),
+    }));
+
+  const fillEmployeeMonthlySalary = (id: string) =>
+    setStore(s => ({
+      ...s,
+      employees: s.employees.map(e => {
+        if (e.id !== id) return e;
+        const v = e.monthlySalary[0] ?? 0;
+        return { ...e, monthlySalary: Array(MONTHS_COUNT).fill(v) };
+      }),
     }));
 
   const removeEmployee = (id: string) =>
@@ -218,8 +327,7 @@ export default function ProjectTracker() {
       })),
     }));
 
-  const addProject = () => {
-    const months = 6;
+  const addProject = () =>
     setStore(s => ({
       ...s,
       projects: [
@@ -227,13 +335,12 @@ export default function ProjectTracker() {
         {
           id: newId(),
           name: '',
-          months,
-          monthlyRevenue: Array(months).fill(0),
+          status: 'active',
+          monthlyRevenue: Array(MONTHS_COUNT).fill(0),
           assignments: [],
         },
       ],
     }));
-  };
 
   const updateProjectFields = (id: string, patch: Partial<Pick<Project, 'name'>>) =>
     setStore(s => ({
@@ -241,25 +348,15 @@ export default function ProjectTracker() {
       projects: s.projects.map(p => (p.id === id ? { ...p, ...patch } : p)),
     }));
 
-  const setProjectMonths = (id: string, rawMonths: number) => {
-    const months = Math.max(0, Math.floor(rawMonths));
+  const toggleProjectStatus = (id: string) =>
     setStore(s => ({
       ...s,
       projects: s.projects.map(p =>
         p.id !== id
           ? p
-          : {
-              ...p,
-              months,
-              monthlyRevenue: fitArray(p.monthlyRevenue, months),
-              assignments: p.assignments.map(a => ({
-                ...a,
-                monthlyAllocation: fitArray(a.monthlyAllocation, months),
-              })),
-            },
+          : { ...p, status: p.status === 'active' ? 'retired' : 'active' },
       ),
     }));
-  };
 
   const removeProject = (id: string) =>
     setStore(s => ({ ...s, projects: s.projects.filter(p => p.id !== id) }));
@@ -281,7 +378,7 @@ export default function ProjectTracker() {
       projects: s.projects.map(p => {
         if (p.id !== projectId) return p;
         const v = p.monthlyRevenue[0] ?? 0;
-        return { ...p, monthlyRevenue: Array(p.months).fill(v) };
+        return { ...p, monthlyRevenue: Array(MONTHS_COUNT).fill(v) };
       }),
     }));
 
@@ -298,7 +395,7 @@ export default function ProjectTracker() {
             {
               id: newId(),
               employeeId: firstEmp ? firstEmp.id : '',
-              monthlyAllocation: Array(p.months).fill(1),
+              monthlyAllocation: Array(MONTHS_COUNT).fill(1),
             },
           ],
         };
@@ -339,7 +436,7 @@ export default function ProjectTracker() {
           assignments: p.assignments.map(a => {
             if (a.id !== assignmentId) return a;
             const next = [...a.monthlyAllocation];
-            next[monthIdx] = Math.max(0, Math.min(1, value));
+            next[monthIdx] = Math.max(0, value);
             return { ...a, monthlyAllocation: next };
           }),
         };
@@ -356,7 +453,7 @@ export default function ProjectTracker() {
           assignments: p.assignments.map(a => {
             if (a.id !== assignmentId) return a;
             const v = a.monthlyAllocation[0] ?? 0;
-            return { ...a, monthlyAllocation: Array(p.months).fill(v) };
+            return { ...a, monthlyAllocation: Array(MONTHS_COUNT).fill(v) };
           }),
         };
       }),
@@ -395,6 +492,8 @@ export default function ProjectTracker() {
       ? 'text-gray-400'
       : 'text-green-600';
 
+  const firstRetiredIdx = sortedProjects.findIndex(p => p.status === 'retired');
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -402,7 +501,7 @@ export default function ProjectTracker() {
           <div>
             <h1 className="text-2xl font-semibold text-gray-800">Project Tracker</h1>
             <p className="text-sm text-gray-500">
-              Track project profitability based on employee fully-loaded costs.
+              Tracking calendar year {YEAR_LABEL}, Jan – Dec.
             </p>
           </div>
           {saveLabel && <span className={`text-xs ${saveColor}`}>{saveLabel}</span>}
@@ -413,6 +512,7 @@ export default function ProjectTracker() {
           <div className="flex items-center mb-4">
             <TrendingUp size={20} className="text-blue-600 mr-2" />
             <h2 className="text-lg font-semibold text-gray-800">Portfolio Rollup</h2>
+            <span className="ml-2 text-xs text-gray-400">(active projects only)</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat label="Total Revenue" value={fmtCurrency(rollup.revenue)} />
@@ -451,72 +551,156 @@ export default function ProjectTracker() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="text-sm border-collapse">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b border-gray-200">
-                    <th className="py-2 pr-4 font-medium">Name</th>
-                    <th className="py-2 pr-4 font-medium">Base Salary (annual)</th>
-                    <th className="py-2 pr-4 font-medium">Overhead ×</th>
-                    <th className="py-2 pr-4 font-medium">Fully-Loaded</th>
-                    <th className="py-2 pr-4 font-medium">Monthly Cost</th>
-                    <th className="py-2 pr-2 font-medium text-right">—</th>
+                  <tr className="text-gray-500 border-b border-gray-200">
+                    <th className="text-left py-1.5 pr-3 font-medium w-44">Name</th>
+                    <th className="text-left py-1.5 pr-3 font-medium w-20">×</th>
+                    <th className="px-1 py-1.5 font-medium w-8"></th>
+                    {MONTH_LABELS.map(m => (
+                      <th
+                        key={m}
+                        className="px-1 py-1.5 font-medium text-center text-xs"
+                      >
+                        {m}
+                      </th>
+                    ))}
+                    <th className="px-2 py-1.5 font-medium text-right text-xs">
+                      Total
+                    </th>
+                    <th className="px-2 py-1.5 font-medium text-right">—</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {employees.map(e => {
-                    const loaded = e.baseSalary * e.overheadMultiple;
-                    return (
-                      <tr key={e.id} className="border-b border-gray-100">
-                        <td className="py-2 pr-4">
-                          <input
-                            type="text"
-                            value={e.name}
-                            onChange={ev =>
-                              updateEmployee(e.id, { name: ev.target.value })
-                            }
-                            placeholder="Employee name"
-                            className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  {employees.map(e => (
+                    <tr key={e.id} className="border-b border-gray-100">
+                      <td className="pr-3 py-1">
+                        <input
+                          type="text"
+                          value={e.name}
+                          onChange={ev =>
+                            updateEmployeeFields(e.id, { name: ev.target.value })
+                          }
+                          placeholder="Name"
+                          className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        />
+                      </td>
+                      <td className="pr-3 py-1">
+                        <CellInput
+                          value={e.overheadMultiple}
+                          step={0.1}
+                          onChange={v =>
+                            updateEmployeeFields(e.id, { overheadMultiple: v })
+                          }
+                        />
+                      </td>
+                      <td className="px-1 py-1">
+                        <button
+                          onClick={() => fillEmployeeMonthlySalary(e.id)}
+                          title="Fill all months with Jan value"
+                          className="text-gray-400 hover:text-blue-500"
+                        >
+                          <ArrowRightToLine size={14} />
+                        </button>
+                      </td>
+                      {MONTH_LABELS.map((_, i) => (
+                        <td key={i} className="px-1 py-1">
+                          <CellInput
+                            value={e.monthlySalary[i] ?? 0}
+                            onChange={v => setEmployeeMonthlySalary(e.id, i, v)}
                           />
                         </td>
-                        <td className="py-2 pr-4">
-                          <NumberInput
-                            value={e.baseSalary}
-                            onChange={v => updateEmployee(e.id, { baseSalary: v })}
-                            prefix="$"
-                          />
-                        </td>
-                        <td className="py-2 pr-4">
-                          <NumberInput
-                            value={e.overheadMultiple}
-                            onChange={v =>
-                              updateEmployee(e.id, { overheadMultiple: v })
-                            }
-                            step={0.1}
-                          />
-                        </td>
-                        <td className="py-2 pr-4 text-gray-700">
-                          {fmtCurrency(loaded)}
-                        </td>
-                        <td className="py-2 pr-4 text-gray-700">
-                          {fmtCurrency(monthlyCost(e))}
-                        </td>
-                        <td className="py-2 pr-2 text-right">
-                          <button
-                            onClick={() => removeEmployee(e.id)}
-                            className="text-gray-400 hover:text-red-500"
-                            title="Remove employee"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      ))}
+                      <td className="px-2 py-1 text-right text-gray-700 text-xs">
+                        {fmtCurrency(empTotalCost(e))}
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        <button
+                          onClick={() => removeEmployee(e.id)}
+                          className="text-gray-400 hover:text-red-500"
+                          title="Remove employee"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
+              <p className="text-xs text-gray-400 mt-2">
+                Enter the salary you actually pay each month. The "×" multiplier is
+                the overhead factor applied on top (e.g. 1.5 = +50% overhead).
+                Fully-loaded monthly cost = monthly salary × multiplier.
+              </p>
             </div>
           )}
         </div>
+
+        {/* Utilization Tracker */}
+        {employees.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center mb-4">
+              <Activity size={20} className="text-blue-600 mr-2" />
+              <h2 className="text-lg font-semibold text-gray-800">
+                Employee Utilization
+              </h2>
+              <span className="ml-2 text-xs text-gray-400">
+                (sum of allocations across active projects)
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="text-sm border-collapse">
+                <thead>
+                  <tr className="text-gray-500 border-b border-gray-200">
+                    <th className="text-left py-1.5 pr-3 font-medium w-44">
+                      Employee
+                    </th>
+                    {MONTH_LABELS.map(m => (
+                      <th
+                        key={m}
+                        className="px-2 py-1.5 font-medium text-center text-xs"
+                      >
+                        {m}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map(e => (
+                    <tr key={e.id} className="border-b border-gray-100">
+                      <td className="pr-3 py-1.5 text-gray-700">
+                        {e.name || '(unnamed)'}
+                      </td>
+                      {MONTH_LABELS.map((_, i) => {
+                        const u = empMonthUtilization(e.id, i, projects);
+                        const tone = utilizationTone(u);
+                        const color =
+                          tone === 'negative'
+                            ? 'bg-red-50 text-red-700'
+                            : tone === 'positive'
+                            ? 'bg-green-50 text-green-700'
+                            : u > 0
+                            ? 'bg-gray-50 text-gray-700'
+                            : 'text-gray-300';
+                        return (
+                          <td
+                            key={i}
+                            className={`px-2 py-1 text-center text-xs rounded ${color}`}
+                          >
+                            {fmtUtil(u)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-gray-400 mt-2">
+                Green = 80–100%, gray = under 80%, red = over 100% (overbooked).
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Projects */}
         <div className="space-y-4">
@@ -533,33 +717,43 @@ export default function ProjectTracker() {
             </button>
           </div>
 
-          {projects.length === 0 ? (
+          {sortedProjects.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <p className="text-sm text-gray-500">
                 No projects yet. Add one to get started.
               </p>
             </div>
           ) : (
-            projects.map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                employees={employees}
-                onUpdateFields={patch => updateProjectFields(p.id, patch)}
-                onSetMonths={m => setProjectMonths(p.id, m)}
-                onRemove={() => removeProject(p.id)}
-                onSetMonthlyRevenue={(i, v) => setMonthlyRevenue(p.id, i, v)}
-                onFillMonthlyRevenue={() => fillMonthlyRevenue(p.id)}
-                onAddAssignment={() => addAssignment(p.id)}
-                onSetAssignmentEmployee={(aid, eid) =>
-                  setAssignmentEmployee(p.id, aid, eid)
-                }
-                onSetMonthlyAllocation={(aid, i, v) =>
-                  setMonthlyAllocation(p.id, aid, i, v)
-                }
-                onFillMonthlyAllocation={aid => fillMonthlyAllocation(p.id, aid)}
-                onRemoveAssignment={aid => removeAssignment(p.id, aid)}
-              />
+            sortedProjects.map((p, idx) => (
+              <React.Fragment key={p.id}>
+                {idx === firstRetiredIdx && firstRetiredIdx > 0 && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <div className="flex-1 border-t border-gray-300" />
+                    <span className="text-xs uppercase tracking-wide text-gray-400">
+                      Retired
+                    </span>
+                    <div className="flex-1 border-t border-gray-300" />
+                  </div>
+                )}
+                <ProjectCard
+                  project={p}
+                  employees={employees}
+                  onUpdateFields={patch => updateProjectFields(p.id, patch)}
+                  onToggleStatus={() => toggleProjectStatus(p.id)}
+                  onRemove={() => removeProject(p.id)}
+                  onSetMonthlyRevenue={(i, v) => setMonthlyRevenue(p.id, i, v)}
+                  onFillMonthlyRevenue={() => fillMonthlyRevenue(p.id)}
+                  onAddAssignment={() => addAssignment(p.id)}
+                  onSetAssignmentEmployee={(aid, eid) =>
+                    setAssignmentEmployee(p.id, aid, eid)
+                  }
+                  onSetMonthlyAllocation={(aid, i, v) =>
+                    setMonthlyAllocation(p.id, aid, i, v)
+                  }
+                  onFillMonthlyAllocation={aid => fillMonthlyAllocation(p.id, aid)}
+                  onRemoveAssignment={aid => removeAssignment(p.id, aid)}
+                />
+              </React.Fragment>
             ))
           )}
         </div>
@@ -591,34 +785,6 @@ function Stat({
   );
 }
 
-function NumberInput({
-  value,
-  onChange,
-  step,
-  prefix,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-  prefix?: string;
-}) {
-  return (
-    <div className="flex items-center border border-gray-200 rounded focus-within:ring-2 focus-within:ring-blue-200">
-      {prefix && <span className="px-2 text-gray-400 text-xs">{prefix}</span>}
-      <input
-        type="number"
-        value={Number.isFinite(value) ? value : 0}
-        step={step ?? 1}
-        onChange={ev => {
-          const n = parseFloat(ev.target.value);
-          onChange(Number.isFinite(n) ? n : 0);
-        }}
-        className="w-full px-2 py-1 focus:outline-none bg-transparent"
-      />
-    </div>
-  );
-}
-
 function CellInput({
   value,
   onChange,
@@ -646,7 +812,7 @@ function ProjectCard({
   project,
   employees,
   onUpdateFields,
-  onSetMonths,
+  onToggleStatus,
   onRemove,
   onSetMonthlyRevenue,
   onFillMonthlyRevenue,
@@ -659,7 +825,7 @@ function ProjectCard({
   project: Project;
   employees: Employee[];
   onUpdateFields: (patch: Partial<Pick<Project, 'name'>>) => void;
-  onSetMonths: (months: number) => void;
+  onToggleStatus: () => void;
   onRemove: () => void;
   onSetMonthlyRevenue: (monthIdx: number, value: number) => void;
   onFillMonthlyRevenue: () => void;
@@ -677,38 +843,61 @@ function ProjectCard({
   const cost = projectCost(project, employees);
   const profit = revenue - cost;
   const margin = revenue > 0 ? profit / revenue : 0;
-  const monthIndices = Array.from({ length: project.months }, (_, i) => i);
+  const monthIndices = Array.from({ length: MONTHS_COUNT }, (_, i) => i);
+  const isRetired = project.status === 'retired';
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div
+      className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${
+        isRetired ? 'opacity-70' : ''
+      }`}
+    >
       <div className="flex flex-wrap gap-4 items-end justify-between mb-4">
-        <div className="flex flex-wrap gap-4 flex-1 min-w-0">
+        <div className="flex flex-wrap gap-4 flex-1 min-w-0 items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1">
               Project Name
             </label>
-            <input
-              type="text"
-              value={project.name}
-              onChange={e => onUpdateFields({ name: e.target.value })}
-              placeholder="Project name"
-              className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-          </div>
-          <div className="w-32">
-            <label className="block text-xs uppercase tracking-wide text-gray-500 mb-1">
-              Months
-            </label>
-            <NumberInput value={project.months} onChange={v => onSetMonths(v)} />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={project.name}
+                onChange={e => onUpdateFields({ name: e.target.value })}
+                placeholder="Project name"
+                className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              {isRetired && (
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded uppercase tracking-wide">
+                  Retired
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <button
-          onClick={onRemove}
-          className="text-gray-400 hover:text-red-500"
-          title="Remove project"
-        >
-          <Trash2 size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleStatus}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
+            title={isRetired ? 'Mark as active' : 'Retire project'}
+          >
+            {isRetired ? (
+              <>
+                <ArchiveRestore size={14} /> Reactivate
+              </>
+            ) : (
+              <>
+                <Archive size={14} /> Retire
+              </>
+            )}
+          </button>
+          <button
+            onClick={onRemove}
+            className="text-gray-400 hover:text-red-500"
+            title="Remove project"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 rounded-lg p-3 mb-4">
@@ -727,7 +916,9 @@ function ProjectCard({
       </div>
 
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-700">Month-by-Month Breakdown</h3>
+        <h3 className="text-sm font-medium text-gray-700">
+          Month-by-Month Breakdown
+        </h3>
         <button
           onClick={onAddAssignment}
           disabled={employees.length === 0}
@@ -737,183 +928,180 @@ function ProjectCard({
         </button>
       </div>
 
-      {project.months === 0 ? (
-        <p className="text-xs text-gray-500">Set the project length (in months) above.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="text-sm border-collapse">
-            <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
-                <th className="text-left py-1.5 pr-3 font-medium w-48">Row</th>
-                <th className="px-1 py-1.5 font-medium w-8"></th>
-                {monthIndices.map(i => (
-                  <th
-                    key={i}
-                    className="px-1 py-1.5 font-medium text-center text-xs"
-                  >
-                    M{i + 1}
-                  </th>
-                ))}
-                <th className="px-2 py-1.5 font-medium text-right text-xs">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-100">
-                <td className="pr-3 py-1 text-gray-700 font-medium">Revenue</td>
-                <td className="px-1 py-1">
-                  <button
-                    onClick={onFillMonthlyRevenue}
-                    title="Fill all months with M1 value"
-                    className="text-gray-400 hover:text-blue-500"
-                  >
-                    <ArrowRightToLine size={14} />
-                  </button>
+      <div className="overflow-x-auto">
+        <table className="text-sm border-collapse">
+          <thead>
+            <tr className="text-gray-500 border-b border-gray-200">
+              <th className="text-left py-1.5 pr-3 font-medium w-48">Row</th>
+              <th className="px-1 py-1.5 font-medium w-8"></th>
+              {MONTH_LABELS.map(m => (
+                <th
+                  key={m}
+                  className="px-1 py-1.5 font-medium text-center text-xs"
+                >
+                  {m}
+                </th>
+              ))}
+              <th className="px-2 py-1.5 font-medium text-right text-xs">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-gray-100">
+              <td className="pr-3 py-1 text-gray-700 font-medium">Revenue</td>
+              <td className="px-1 py-1">
+                <button
+                  onClick={onFillMonthlyRevenue}
+                  title="Fill all months with Jan value"
+                  className="text-gray-400 hover:text-blue-500"
+                >
+                  <ArrowRightToLine size={14} />
+                </button>
+              </td>
+              {monthIndices.map(i => (
+                <td key={i} className="px-1 py-1">
+                  <CellInput
+                    value={project.monthlyRevenue[i] ?? 0}
+                    onChange={v => onSetMonthlyRevenue(i, v)}
+                  />
                 </td>
-                {monthIndices.map(i => (
-                  <td key={i} className="px-1 py-1">
-                    <CellInput
-                      value={project.monthlyRevenue[i] ?? 0}
-                      onChange={v => onSetMonthlyRevenue(i, v)}
-                    />
-                  </td>
-                ))}
-                <td className="px-2 py-1 text-right text-gray-700">
-                  {fmtCurrency(revenue)}
-                </td>
-              </tr>
+              ))}
+              <td className="px-2 py-1 text-right text-gray-700">
+                {fmtCurrency(revenue)}
+              </td>
+            </tr>
 
-              {project.assignments.map(a => {
-                const emp = employees.find(e => e.id === a.employeeId);
-                const aTotalCost = emp
-                  ? a.monthlyAllocation.reduce(
-                      (s, alloc) => s + monthlyCost(emp) * (alloc || 0),
-                      0,
-                    )
-                  : 0;
-                return (
-                  <tr key={a.id} className="border-b border-gray-100">
-                    <td className="pr-3 py-1">
-                      <div className="flex items-center gap-1">
-                        <select
-                          value={a.employeeId}
-                          onChange={ev =>
-                            onSetAssignmentEmployee(a.id, ev.target.value)
-                          }
-                          className="flex-1 min-w-0 border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-200"
-                        >
-                          <option value="">— Select —</option>
-                          {employees.map(e => (
-                            <option key={e.id} value={e.id}>
-                              {e.name || '(unnamed)'}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => onRemoveAssignment(a.id)}
-                          className="text-gray-400 hover:text-red-500"
-                          title="Remove assignment"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-1 py-1">
-                      <button
-                        onClick={() => onFillMonthlyAllocation(a.id)}
-                        title="Fill all months with M1 value"
-                        className="text-gray-400 hover:text-blue-500"
+            {project.assignments.map(a => {
+              const emp = employees.find(e => e.id === a.employeeId);
+              const aTotalCost = emp
+                ? a.monthlyAllocation.reduce(
+                    (s, alloc, i) =>
+                      s + empMonthCost(emp, i) * (alloc || 0),
+                    0,
+                  )
+                : 0;
+              return (
+                <tr key={a.id} className="border-b border-gray-100">
+                  <td className="pr-3 py-1">
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={a.employeeId}
+                        onChange={ev =>
+                          onSetAssignmentEmployee(a.id, ev.target.value)
+                        }
+                        className="flex-1 min-w-0 border border-gray-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-200"
                       >
-                        <ArrowRightToLine size={14} />
+                        <option value="">— Select —</option>
+                        {employees.map(e => (
+                          <option key={e.id} value={e.id}>
+                            {e.name || '(unnamed)'}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => onRemoveAssignment(a.id)}
+                        className="text-gray-400 hover:text-red-500"
+                        title="Remove assignment"
+                      >
+                        <Trash2 size={14} />
                       </button>
+                    </div>
+                  </td>
+                  <td className="px-1 py-1">
+                    <button
+                      onClick={() => onFillMonthlyAllocation(a.id)}
+                      title="Fill all months with Jan value"
+                      className="text-gray-400 hover:text-blue-500"
+                    >
+                      <ArrowRightToLine size={14} />
+                    </button>
+                  </td>
+                  {monthIndices.map(i => (
+                    <td key={i} className="px-1 py-1">
+                      <CellInput
+                        value={a.monthlyAllocation[i] ?? 0}
+                        step={0.05}
+                        onChange={v => onSetMonthlyAllocation(a.id, i, v)}
+                      />
                     </td>
-                    {monthIndices.map(i => (
-                      <td key={i} className="px-1 py-1">
-                        <CellInput
-                          value={a.monthlyAllocation[i] ?? 0}
-                          step={0.05}
-                          onChange={v => onSetMonthlyAllocation(a.id, i, v)}
-                        />
-                      </td>
-                    ))}
-                    <td className="px-2 py-1 text-right text-gray-700">
-                      {fmtCurrency(aTotalCost)}
-                    </td>
-                  </tr>
+                  ))}
+                  <td className="px-2 py-1 text-right text-gray-700">
+                    {fmtCurrency(aTotalCost)}
+                  </td>
+                </tr>
+              );
+            })}
+
+            <tr className="border-t-2 border-gray-200 text-xs">
+              <td className="pr-3 py-1 text-gray-500">Cost</td>
+              <td></td>
+              {monthIndices.map(i => (
+                <td key={i} className="px-1 py-1 text-gray-700 text-right">
+                  {fmtCurrency(projectMonthCost(project, i, employees))}
+                </td>
+              ))}
+              <td className="px-2 py-1 text-right text-gray-700">
+                {fmtCurrency(cost)}
+              </td>
+            </tr>
+            <tr className="text-xs">
+              <td className="pr-3 py-1 text-gray-500">Profit</td>
+              <td></td>
+              {monthIndices.map(i => {
+                const r = project.monthlyRevenue[i] ?? 0;
+                const c = projectMonthCost(project, i, employees);
+                const v = r - c;
+                return (
+                  <td
+                    key={i}
+                    className={`px-1 py-1 text-right ${
+                      v >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}
+                  >
+                    {fmtCurrency(v)}
+                  </td>
                 );
               })}
-
-              <tr className="border-t-2 border-gray-200 text-xs">
-                <td className="pr-3 py-1 text-gray-500">Cost</td>
-                <td></td>
-                {monthIndices.map(i => (
-                  <td key={i} className="px-1 py-1 text-gray-700 text-right">
-                    {fmtCurrency(monthCost(project, i, employees))}
+              <td
+                className={`px-2 py-1 text-right ${
+                  profit >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {fmtCurrency(profit)}
+              </td>
+            </tr>
+            <tr className="text-xs">
+              <td className="pr-3 py-1 text-gray-500">Margin</td>
+              <td></td>
+              {monthIndices.map(i => {
+                const r = project.monthlyRevenue[i] ?? 0;
+                const c = projectMonthCost(project, i, employees);
+                const m = r > 0 ? (r - c) / r : 0;
+                return (
+                  <td
+                    key={i}
+                    className={`px-1 py-1 text-right ${
+                      m >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}
+                  >
+                    {fmtPct(m)}
                   </td>
-                ))}
-                <td className="px-2 py-1 text-right text-gray-700">
-                  {fmtCurrency(cost)}
-                </td>
-              </tr>
-              <tr className="text-xs">
-                <td className="pr-3 py-1 text-gray-500">Profit</td>
-                <td></td>
-                {monthIndices.map(i => {
-                  const r = project.monthlyRevenue[i] ?? 0;
-                  const c = monthCost(project, i, employees);
-                  const v = r - c;
-                  return (
-                    <td
-                      key={i}
-                      className={`px-1 py-1 text-right ${
-                        v >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {fmtCurrency(v)}
-                    </td>
-                  );
-                })}
-                <td
-                  className={`px-2 py-1 text-right ${
-                    profit >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {fmtCurrency(profit)}
-                </td>
-              </tr>
-              <tr className="text-xs">
-                <td className="pr-3 py-1 text-gray-500">Margin</td>
-                <td></td>
-                {monthIndices.map(i => {
-                  const r = project.monthlyRevenue[i] ?? 0;
-                  const c = monthCost(project, i, employees);
-                  const m = r > 0 ? (r - c) / r : 0;
-                  return (
-                    <td
-                      key={i}
-                      className={`px-1 py-1 text-right ${
-                        m >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {fmtPct(m)}
-                    </td>
-                  );
-                })}
-                <td
-                  className={`px-2 py-1 text-right ${
-                    margin >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {fmtPct(margin)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="text-xs text-gray-400 mt-2">
-            Allocation per month is a fraction of full-time (0.5 = half-time, 1 =
-            full-time). Use the arrow icon to copy M1's value across all months.
-          </p>
-        </div>
-      )}
+                );
+              })}
+              <td
+                className={`px-2 py-1 text-right ${
+                  margin >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {fmtPct(margin)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="text-xs text-gray-400 mt-2">
+          Allocation is a fraction of full-time per month (0.5 = half-time, 1 =
+          full-time). Use the arrow icon to copy Jan's value across all months.
+        </p>
+      </div>
     </div>
   );
 }
