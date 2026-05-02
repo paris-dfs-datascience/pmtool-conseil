@@ -1,6 +1,8 @@
 // src/components/project-tracker/project-tracker.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Users, Briefcase, TrendingUp } from 'lucide-react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase.js';
 
 interface Employee {
   id: string;
@@ -29,26 +31,21 @@ interface Store {
   projects: Project[];
 }
 
-const STORAGE_KEY = 'lma_project_tracker_v1';
+const FIRESTORE_COLLECTION = 'tools';
+const FIRESTORE_DOC = 'projectTracker';
+const SAVE_DEBOUNCE_MS = 600;
 
 const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
 
-const loadStore = (): Store => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { employees: [], projects: [] };
-    const parsed = JSON.parse(raw) as Store;
-    return {
-      employees: Array.isArray(parsed.employees) ? parsed.employees : [],
-      projects: Array.isArray(parsed.projects) ? parsed.projects : [],
-    };
-  } catch {
-    return { employees: [], projects: [] };
-  }
-};
+const emptyStore = (): Store => ({ employees: [], projects: [] });
+
+const sanitizeStore = (raw: any): Store => ({
+  employees: Array.isArray(raw?.employees) ? raw.employees : [],
+  projects: Array.isArray(raw?.projects) ? raw.projects : [],
+});
 
 const fmtCurrency = (n: number) =>
   new Intl.NumberFormat('en-US', {
@@ -72,14 +69,55 @@ const projectCost = (p: Project, employees: Employee[]) =>
   }, 0);
 
 export default function ProjectTracker() {
-  const [store, setStore] = useState<Store>(() => loadStore());
+  const [store, setStore] = useState<Store>(emptyStore);
+  const [loading, setLoading] = useState(true);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+  );
+  const hasLoaded = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-    } catch {
-      /* ignore */
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ref = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+        const snap = await getDoc(ref);
+        if (cancelled) return;
+        if (snap.exists()) {
+          setStore(sanitizeStore(snap.data()));
+        }
+      } catch (err) {
+        console.error('Failed to load project tracker from Firestore:', err);
+      } finally {
+        if (!cancelled) {
+          hasLoaded.current = true;
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveState('saving');
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const ref = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+        await setDoc(ref, store, { merge: false });
+        setSaveState('saved');
+      } catch (err) {
+        console.error('Failed to save project tracker to Firestore:', err);
+        setSaveState('error');
+      }
+    }, SAVE_DEBOUNCE_MS);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
   }, [store]);
 
   const { employees, projects } = store;
@@ -190,14 +228,42 @@ export default function ProjectTracker() {
       ),
     }));
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  const saveLabel =
+    saveState === 'saving'
+      ? 'Saving…'
+      : saveState === 'saved'
+      ? 'Saved'
+      : saveState === 'error'
+      ? 'Save failed'
+      : '';
+  const saveColor =
+    saveState === 'error'
+      ? 'text-red-500'
+      : saveState === 'saving'
+      ? 'text-gray-400'
+      : 'text-green-600';
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Project Tracker</h1>
-          <p className="text-sm text-gray-500">
-            Track project profitability based on employee fully-loaded costs.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-800">Project Tracker</h1>
+            <p className="text-sm text-gray-500">
+              Track project profitability based on employee fully-loaded costs.
+            </p>
+          </div>
+          {saveLabel && (
+            <span className={`text-xs ${saveColor}`}>{saveLabel}</span>
+          )}
         </div>
 
         {/* Rollup */}
